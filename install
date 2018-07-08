@@ -16,7 +16,6 @@ git submodule update --init --recursive "${DOTBOT_DIR}"
 # Install Vundle
 git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
 
-
 # Link nvim to vimrc
 ln -s ../.vim ~/.config/nvim
 ln -s ../.vimrc ~/.vim/init.vim
