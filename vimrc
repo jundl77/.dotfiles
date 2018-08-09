@@ -2,49 +2,50 @@ set shell=bash
 set nocompatible              " be iMproved, required
 filetype off                  " required
 
-" set the runtime path to include Vundle and initialize
-set rtp+=~/.vim/bundle/Vundle.vim
-call vundle#begin()
-" alternatively, pass a path where Vundle should install plugins
-"call vundle#begin('~/some/path/here')
+" PLUGINS START ---- Specify directory for plugins
+if has('nvim')
+  call plug#begin('~/.config/nvim/plugged')
+else
+  call plug#begin('~/.vim/plugged')
+endif
 
-" let Vundle manage Vundle, required
-Plugin 'VundleVim/Vundle.vim'
-Plugin 'scrooloose/nerdtree'
-Plugin 'scrooloose/syntastic'
-Plugin 'scrooloose/nerdcommenter'
-Plugin 'easymotion/vim-easymotion'
-Plugin 'Shougo/vimproc.vim'
-Plugin 'Quramy/tsuquyomi'
-Plugin 'nvie/vim-flake8'
-Plugin 'Quramy/vim-js-pretty-template'
-Plugin 'pangloss/vim-javascript'
-Plugin 'mxw/vim-jsx'
-Plugin 'bling/vim-airline'
-Plugin 'vim-airline/vim-airline-themes'
-Plugin 'tpope/vim-repeat'
-Plugin 'wakatime/vim-wakatime'
-Plugin 'terryma/vim-multiple-cursors'
-Plugin 'Valloric/YouCompleteMe'
-Plugin 'ctrlpvim/ctrlp.vim'
-Plugin 'Raimondi/delimitMate'
-Plugin 'suan/vim-instant-markdown'
-Plugin 'tpope/vim-surround'
+" Plugins for neovim and vim
+Plug 'scrooloose/nerdtree'
+Plug 'scrooloose/nerdcommenter'
+Plug 'easymotion/vim-easymotion'
+Plug 'Shougo/vimproc.vim'
+Plug 'nvie/vim-flake8'
+Plug 'bling/vim-airline'
+Plug 'vim-airline/vim-airline-themes'
+Plug 'tpope/vim-repeat'
+Plug 'terryma/vim-multiple-cursors'
+Plug 'ctrlpvim/ctrlp.vim'
+Plug 'Raimondi/delimitMate'
+Plug 'kana/vim-submode'
+Plug 'rhysd/vim-grammarous'
+Plug 'reedes/vim-wordy'
 
-" All of your Plugins must be added before the following line
-call vundle#end()            " required
-filetype plugin indent on    " required
-" To ignore plugin indent changes, instead use:
-"filetype plugin on
+" Install vim or neovim specific plugins
+if has('nvim')
+  Plug 'neomake/neomake'
+else
+  Plug 'scrooloose/syntastic'
+  Plug 'Valloric/YouCompleteMe'
+endif
+
+call plug#end()
 "
 " Brief help
-" :PluginList       - lists configured plugins
-" :PluginInstall    - installs plugins; append `!` to update or just :PluginUpdate
-" :PluginSearch foo - searches for foo; append `!` to refresh local cache
-" :PluginClean      - confirms removal of unused plugins; append `!` to auto-approve removal
+"   :PlugInstall [name ...] [#threads]	       Install plugins
+"   :PlugUpdate [name ...] [#threads]	         Install or update plugins
+"   :PlugClean[!]	                             Remove unused directories (bang version will clean without prompt)
+"   :PlugUpgrade	                             Upgrade vim-plug itself
+"   :PlugStatus	                               Check the status of plugins
+"   :PlugDiff	                                 Examine changes from the previous update and the pending changes
+"   :PlugSnapshot[!] [output path]	           Generate script for restoring the current snapshot of the plugins
 "
-" see :h vundle for more details or wiki for FAQ
-" Put your non-Plugin stuff after this line
+" PLUGINS END
+
 let mapleader=","
 syntax on
 set number
@@ -55,14 +56,23 @@ nnoremap <S-Tab> :bprevious<CR>
 map q: <Nop>
 nnoremap Q <nop>
 autocmd InsertLeave * write
+
+" Special config for iTerm
 if $TERM_PROGRAM =~ "iTerm"
   let &t_SI = "\<Esc>]50;CursorShape=1\x7" " Vertical bar in insert mode
   let &t_EI = "\<Esc>]50;CursorShape=0\x7" " Block in normal mode
 endif"
 
 " Put plugins and dictionaries in this dir (also on Windows)
-let vimDir = '$HOME/.vim'
+if has('nvim')
+  let vimDir = '$HOME/.bundle/nvim'
+else
+  let vimDir = '$HOME/.vim'
+endif
 let &runtimepath.=','.vimDir
+
+" Set up spellchecking
+" set spell spelllang=en_us
 
 " Keep undo history across sessions by storing it in a file
 if has('persistent_undo')
@@ -111,14 +121,24 @@ set statusline+=%#warningmsg#
 set statusline+=%{SyntasticStatuslineFlag()}
 set statusline+=%*
 
-let g:syntastic_always_populate_loc_list = 1
-let g:syntastic_auto_loc_list = 1
-let g:syntastic_check_on_open = 1
-let g:syntastic_check_on_wq = 1
-let g:syntastic_typescript_tsc_fname = ''
-let g:syntastic_typescript_tsc_args = '--target ES6'
-let g:syntastic_javascript_checkers = ['jsxhint']
-let g:syntastic_javascript_jsxhint_exec = 'jsx-jshint-wrapper'
+" Config syntastic
+if has('nvim')
+  call neomake#configure#automake('nrwi', 500)
+else
+  let g:syntastic_always_populate_loc_list = 1
+  let g:syntastic_auto_loc_list = 1
+  let g:syntastic_check_on_open = 1
+  let g:syntastic_check_on_wq = 1
+  let g:syntastic_typescript_tsc_fname = ''
+  let g:syntastic_typescript_tsc_args = '--target ES6'
+  let g:syntastic_javascript_checkers = ['jsxhint']
+  let g:syntastic_javascript_jsxhint_exec = 'jsx-jshint-wrapper'
+  let g:syntastic_quiet_messages = { "regex": [
+          \ '\possible unwanted space at "{"',
+          \ '\Command terminated with space',
+          \ ] }
+endif
+
 let g:indentLine_enabled = 1
 let g:indentLine_color_term = 239
 let g:indentLine_char = '|'
@@ -160,6 +180,42 @@ set number relativenumber
 map <Enter> o<ESC>
 map <S-Enter> O<ESC>
 
+" Setting leader char to semicolon (on home row)
+let mapleader = ";"
+
+" Setting window navigation
+" Create a submode to handle windows
+" The submode is entered whith <Leader>k and exited with <Leader>
+call submode#enter_with('WindowsMode', 'n', '', '<Leader>k', ':echo "windows mode"<CR>')
+call submode#leave_with('WindowsMode', 'n', '', '<Leader>')
+
+" Change of windows with hjkl
+call submode#map('WindowsMode', 'n', '', 'j', '<C-w>j')
+call submode#map('WindowsMode', 'n', '', 'k', '<C-w>k')
+call submode#map('WindowsMode', 'n', '', 'h', '<C-w>h')
+call submode#map('WindowsMode', 'n', '', 'l', '<C-w>l')
+
+" Close a window with q
+call submode#map('WindowsMode', 'n', '', 'q', '<C-w>c')
+
+" Setting tab navigation
+nnoremap th  :tabfirst<CR>
+nnoremap tk  :tabnext<CR>
+nnoremap tj  :tabprev<CR>
+nnoremap tl  :tablast<CR>
+nnoremap tt  :tabedit<Space>
+nnoremap tn  :tabnext<Space>
+nnoremap tm  :tabm<Space>
+nnoremap td  :tabclose<CR>
+
+" Setting buffer navigation
+" Next buffer
+map <leader>n :bn<cr>
+" Previous buffer
+map <leader>p :bp<cr>
+" Close buffer
+map <leader>d :bd<cr>
+
 " Disabling the directional keys
 map <up> <nop>
 map <down> <nop>
@@ -170,10 +226,14 @@ imap <down> <nop>
 imap <left> <nop>
 imap <right> <nop>
 
+imap gj j
+imap gk k
+set tw=180
+
 " Map ESC key to more user friendly places
 imap ii <Esc>
 nnoremap <Tab> <Esc>
-vnoremap <Tab> <Esc>gV
+vnoremap <Tab> <Esc>
 onoremap <Tab> <Esc>
 cnoremap <Tab> <C-C><Esc>
 
