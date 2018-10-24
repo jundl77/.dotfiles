@@ -10,3 +10,7 @@
 - run ```./install```
 - open vim and run ```:PluginInstall``` inside command mode
 
+## Dependencies:
+
+- fish
+
