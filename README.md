@@ -9,7 +9,7 @@
 
 - install dependencies
 - run ```./install```
-- open vim and run ```:PluginInstall``` inside command mode
+- open vim/nvim and run ```:PlugInstall```
 
 ## Dependencies:
 
