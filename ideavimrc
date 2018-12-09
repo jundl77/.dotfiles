@@ -1,0 +1,56 @@
+" ============================================================================
+" Load default vimrc config
+" ============================================================================
+"
+source ~/.vimrc
+
+
+" ============================================================================
+" Activate plugins
+" ============================================================================
+"
+set surround
+set gdefault
+set ignorecase
+
+
+" ============================================================================
+" AceJump config
+" ============================================================================
+"
+" Press `f` to activate AceJump
+map f :action AceAction<CR>
+
+" Press `F` to activate Target Mode
+map F :action AceTargetAction<CR>
+
+" Press `g` to activate Line Mode
+map g :action AceLineAction<CR>
+
+
+" ============================================================================
+" Editor control
+" ============================================================================
+
+" Enter the command-line mode
+noremap <CR> :
+
+" Reload .ideavimrc
+nnoremap <Space>vs :source ~/.ideavimrc<CR>
+
+
+" ============================================================================
+" IDE actions
+" ============================================================================
+
+nnoremap / :action Find<CR>
+nnoremap n :action FindNext<CR>
+nnoremap N :action FindPrevious<CR>
+nnoremap U :action $Redo<CR>
+nnoremap ; :action AceJumpAction<CR>
+nnoremap <Space>o :action GotoClass<CR>
+nnoremap <Space>O :action GotoFile<CR>
+nnoremap <Space>d :action CloseContent<CR>
+nnoremap <Space>j :action RecentFiles<CR>
+nnoremap <Space>k :action FileStructurePopup<CR>
+nnoremap <Space>h :action QuickJavaDoc<CR>

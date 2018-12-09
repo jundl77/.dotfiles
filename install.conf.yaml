@@ -2,5 +2,6 @@
 
 - link:
     ~/.vimrc: vimrc
+    ~/.ideavimrc: ideavimrc
     ~/.config/fish: config/fish
 
