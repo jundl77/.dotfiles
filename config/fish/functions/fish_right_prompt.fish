@@ -1,70 +1,42 @@
-# You can override some default right prompt options in your config.fish:
-#     set -g theme_date_format "+%a %H:%M"
+# right prompt for agnoster theme
+# shows vim mode status
 
-function __bobthefish_cmd_duration -S -d 'Show command duration'
-  [ "$theme_display_cmd_duration" = "no" ]; and return
-  [ -z "$CMD_DURATION" -o "$CMD_DURATION" -lt 100 ]; and return
+# ===========================
+# Color setting
 
-  if [ "$CMD_DURATION" -lt 5000 ]
-    echo -ns $CMD_DURATION 'ms'
-  else if [ "$CMD_DURATION" -lt 60000 ]
-    __bobthefish_pretty_ms $CMD_DURATION s
-  else if [ "$CMD_DURATION" -lt 3600000 ]
-    set_color $fish_color_error
-    __bobthefish_pretty_ms $CMD_DURATION m
-  else
-    set_color $fish_color_error
-    __bobthefish_pretty_ms $CMD_DURATION h
-  end
+# You can set these variables in config.fish like:
+# set -g color_dir_bg red
+# If not set, default color from agnoster will be used.
+# ===========================
+set -q color_vi_mode_indicator; or set color_vi_mode_indicator black
+set -q color_vi_mode_normal; or set color_vi_mode_normal green
+set -q color_vi_mode_insert; or set color_vi_mode_insert blue 
+set -q color_vi_mode_visual; or set color_vi_mode_visual red
 
-  set_color $fish_color_normal
-  set_color $fish_color_autosuggestion
-
-  [ "$theme_display_date" = "no" ]
-    or echo -ns ' ' $__bobthefish_left_arrow_glyph
+function prompt_vi_mode -d 'vi mode status indicator'
+  set -l right_segment_separator \uE0B2
+  switch $fish_bind_mode
+      case default
+        set_color $color_vi_mode_normal
+        echo "$right_segment_separator"
+        set_color -b $color_vi_mode_normal $color_vi_mode_indicator
+        echo " N "
+      case insert
+        set_color $color_vi_mode_insert
+        echo "$right_segment_separator"
+        set_color -b $color_vi_mode_insert $color_vi_mode_indicator
+        echo " I "
+      case visual
+        set_color $color_vi_mode_visual
+        echo "$right_segment_separator"
+        set_color -b $color_vi_mode_visual $color_vi_mode_indicator
+        echo " V "
+    end
 end
 
-function __bobthefish_pretty_ms -S -a ms interval -d 'Millisecond formatting for humans'
-  set -l interval_ms
-  set -l scale 1
-
-  switch $interval
-    case s
-      set interval_ms 1000
-    case m
-      set interval_ms 60000
-    case h
-      set interval_ms 3600000
-      set scale 2
+function fish_right_prompt -d 'Prints right prompt'
+  if test "$fish_key_bindings" = "fish_vi_key_bindings"
+    prompt_vi_mode
+    set_color normal
   end
-
-  switch $FISH_VERSION
-    # Fish 2.3 and lower doesn't know about the -s argument to math.
-    case 2.0.\* 2.1.\* 2.2.\* 2.3.\*
-      math "scale=$scale;$ms/$interval_ms" | string replace -r '\\.?0*$' $interval
-    case \*
-      math -s$scale "$ms/$interval_ms" | string replace -r '\\.?0*$' $interval
-  end
-end
-
-function __bobthefish_timestamp -S -d 'Show the current timestamp'
-  [ "$theme_display_date" = "no" ]; and return
-  set -q theme_date_format
-    or set -l theme_date_format "+%c"
-
-  echo -n ' '
-  date $theme_date_format
-end
-
-function fish_right_prompt -d 'bobthefish is all about the right prompt'
-  set -l __bobthefish_left_arrow_glyph \uE0B3
-  if [ "$theme_powerline_fonts" = "no" ]
-    set __bobthefish_left_arrow_glyph '<'
-  end
-
-  set_color $fish_color_autosuggestion
-
-  __bobthefish_cmd_duration
-  __bobthefish_timestamp
-  set_color normal
 end
