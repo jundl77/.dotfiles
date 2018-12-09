@@ -10,7 +10,6 @@ else
 endif
 
 " Plugins for neovim and vim
-Plug 'scrooloose/nerdtree'
 Plug 'scrooloose/nerdcommenter'
 Plug 'easymotion/vim-easymotion'
 Plug 'Shougo/vimproc.vim'
@@ -21,7 +20,6 @@ Plug 'tpope/vim-repeat'
 Plug 'terryma/vim-multiple-cursors'
 Plug 'ctrlpvim/ctrlp.vim'
 Plug 'Raimondi/delimitMate'
-Plug 'kana/vim-submode'
 Plug 'rhysd/vim-grammarous'
 Plug 'reedes/vim-wordy'
 
