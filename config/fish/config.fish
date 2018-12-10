@@ -1,5 +1,15 @@
 # Fish shell
 
+# less highlighting
+set hilite (which highlight)
+set -x LESSOPEN "| $hilite %s --out-format xterm256 --line-numbers --quiet --force --style solarized-light"
+set -x LESS " -R"
+
+#set hilite (which src-hilite-lesspipe.sh)
+#set -x LESSOPEN "| $hilite %s"
+#set -x LESS " -R -X -F "
+
+# Import bash_profile
 egrep "^export " ~/.bash_profile | while read e
 	set var (echo $e | sed -E "s/^export ([A-Z_]+)=(.*)\$/\1/")
 	set value (echo $e | sed -E "s/^export ([A-Z_]+)=(.*)\$/\2/")
