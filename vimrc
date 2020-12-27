@@ -1,4 +1,14 @@
 set shell=bash
+
+
+
+
+
+
+
+
+
+
 set nocompatible              " be iMproved, required
 filetype off                  " required
 
@@ -237,4 +247,4 @@ onoremap <Tab> <Esc>
 cnoremap <Tab> <C-C><Esc>
 
 " Share clipboard (OSX)
-set clipboard=unnamed
+" set clipboard=unnamed
