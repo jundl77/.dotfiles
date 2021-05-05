@@ -20,3 +20,6 @@ curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
 # Link nvim to vim
 ln -s ../.vim ~/.config/nvim
 ln -s ../.vimrc ~/.vim/init.vim
+
+# Add julian_bash to bashrc
+echo "source ~/.dotfiles/julian_bash.sh" >> ~/.bashrc
