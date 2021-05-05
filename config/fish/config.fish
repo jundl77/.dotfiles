@@ -10,7 +10,7 @@ set -x LESS " -R"
 #set -x LESS " -R -X -F "
 
 # Import bash_profile
-egrep "^export " ~/.bashrc | while read e
+egrep "^export " ~/.bash_profile | while read e
 	set var (echo $e | sed -E "s/^export ([A-Z_]+)=(.*)\$/\1/")
 	set value (echo $e | sed -E "s/^export ([A-Z_]+)=(.*)\$/\2/")
 	
