@@ -11,3 +11,5 @@ git config --global alias.sm submodule
 
 export PATH="$HOME/bin:$PATH"
 
+alias proj='cd ~/projects'
+alias log='cd ~/log'

@@ -9,6 +9,8 @@ set -x LESS " -R"
 #set -x LESSOPEN "| $hilite %s"
 #set -x LESS " -R -X -F "
 
+source ~/.bash_profile
+
 # Import bash_profile
 egrep "^export " ~/.bash_profile | while read e
 	set var (echo $e | sed -E "s/^export ([A-Z_]+)=(.*)\$/\1/")
