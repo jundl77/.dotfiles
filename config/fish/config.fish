@@ -9,7 +9,7 @@ set -x LESS " -R"
 #set -x LESSOPEN "| $hilite %s"
 #set -x LESS " -R -X -F "
 
-source ~/.bash_profile
+source ~/.dotfiles/julian_bash.sh
 
 # Import bash_profile
 egrep "^export " ~/.bash_profile | while read e
