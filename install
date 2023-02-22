@@ -16,10 +16,16 @@ git submodule update --init --recursive "${DOTBOT_DIR}"
 # Install Vim-Plug
 curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
     https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
-    
+
 # Link nvim to vim
 ln -s ../.vim ~/.config/nvim
 ln -s ../.vimrc ~/.vim/init.vim
+
+# Install brew packages
+brew install exa
+brew install lnav
+brew install bat
+brew install ripgrep
 
 # Add julian_bash to bashrc
 echo "source ~/.dotfiles/julian_bash.sh" >> ~/.bashrc
