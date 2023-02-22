@@ -4,6 +4,7 @@
 
 - vimrc
 - fish config
+- a few handy binaries installed via brew
 
 ## Usage:
 
@@ -14,4 +15,5 @@
 ## Dependencies:
 
 - fish
+- brew
 
