@@ -13,5 +13,5 @@ export PATH="$HOME/bin:$PATH"
 
 alias proj='cd ~/projects'
 alias log='cd ~/log'
-alias ll="exa -lh -snew"
+alias ll="exa -lah -snew"
 
