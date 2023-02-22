@@ -15,3 +15,5 @@ alias proj='cd ~/projects'
 alias log='cd ~/log'
 alias ll="exa -lah -snew"
 
+# use highlight inplace of cat
+alias cat="highlight $1 --out-format xterm256 --line-numbers --quiet --force --style solarized-light"
