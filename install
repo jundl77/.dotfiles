@@ -19,6 +19,7 @@ brew install lnav
 brew install bat
 brew install ripgrep
 brew install highlight
+brew install node  # required by Mason to install pyright (see vimrc)
 
 # Install Vim-Plug
 curl -fLo ~/.vim/autoload/plug.vim --create-dirs \

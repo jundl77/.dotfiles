@@ -6,6 +6,19 @@ $ErrorActionPreference = "Stop"
 if (-not (Get-Command nvim -ErrorAction SilentlyContinue)) {
     winget install Neovim.Neovim --accept-package-agreements --accept-source-agreements
 }
+if (-not (Get-Command rg -ErrorAction SilentlyContinue)) {
+    # required by Telescope's live_grep (Ctrl+Shift+F)
+    winget install BurntSushi.ripgrep.MSVC --accept-package-agreements --accept-source-agreements
+}
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    # required by Mason to install pyright (lua_ls ships as a standalone binary, no node needed)
+    winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+}
+
+# Winget-installed binaries land on the machine/user PATH, but this process's own
+# PATH was cached at startup, so a fresh install of nvim/rg above wouldn't be found yet.
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+    [System.Environment]::GetEnvironmentVariable("Path", "User")
 
 $configDir = Join-Path $env:LOCALAPPDATA "nvim"
 New-Item -ItemType Directory -Force -Path $configDir | Out-Null
@@ -40,6 +53,10 @@ if (-not (Test-Path $plugPath)) {
     Write-Output "Installed vim-plug."
 }
 
-Write-Output "Running :PlugInstall headlessly (some plugins may need manual follow-up on Windows)..."
-nvim --headless "+PlugInstall" "+qa"
+Write-Output "Running :PlugClean! and :PlugInstall headlessly (some plugins may need manual follow-up on Windows)..."
+nvim --headless "+PlugClean!" "+PlugInstall" "+qa"
+
+Write-Output "Installing language servers via Mason (pyright, lua_ls)..."
+nvim --headless "+MasonInstall pyright lua_ls" "+qa"
+
 Write-Output "Neovim setup complete."

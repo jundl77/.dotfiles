@@ -12,16 +12,20 @@ endif
 
 " Plugins for neovim and vim
 Plug 'scrooloose/nerdcommenter'
-Plug 'easymotion/vim-easymotion'
-Plug 'Shougo/vimproc.vim'
+Plug 'phaazon/hop.nvim'                     " replaces easymotion/vim-easymotion (unmaintained)
 Plug 'nvie/vim-flake8'
-Plug 'bling/vim-airline'
-Plug 'vim-airline/vim-airline-themes'
+Plug 'nvim-lualine/lualine.nvim'            " replaces bling/vim-airline (unmaintained)
+Plug 'nvim-tree/nvim-web-devicons'
 Plug 'tpope/vim-repeat'
-Plug 'terryma/vim-multiple-cursors'
+Plug 'mg979/vim-visual-multi'               " replaces terryma/vim-multiple-cursors (unmaintained)
 Plug 'kana/vim-submode'
-Plug 'ctrlpvim/ctrlp.vim'
-Plug 'Raimondi/delimitMate'
+Plug 'nvim-lua/plenary.nvim'
+Plug 'nvim-telescope/telescope.nvim'        " replaces ctrlpvim/ctrlp.vim (old, no live-grep)
+Plug 'nvim-tree/nvim-tree.lua'              " file-explorer sidebar, replaces NERDTree
+Plug 'windwp/nvim-autopairs'                " replaces Raimondi/delimitMate (unmaintained)
+Plug 'neovim/nvim-lspconfig'                " CLion-style go-to-def/rename/find-usages
+Plug 'williamboman/mason.nvim'              " auto-installs language servers
+Plug 'williamboman/mason-lspconfig.nvim'
 Plug 'rhysd/vim-grammarous'
 Plug 'reedes/vim-wordy'
 
@@ -97,29 +101,18 @@ highlight Folded ctermbg=darkgrey guibg=darkgrey
 
 set backspace=indent,eol,start
 
-let g:airline#extensions#tabline#enabled = 1
-let g:airline#extensions#tabline#fnamemod = ':t'
 set laststatus=2
 
-let g:EasyMotion_do_mapping = 0 " Disable default mappings
-let g:EasyMotion_smartcase = 1
+" hop.nvim jump-to-match (replaces easymotion); native /, n, N restored
+nnoremap s <cmd>HopChar2<CR>
+nnoremap S <cmd>HopWord<CR>
 
-" Gif config
-map  / <Plug>(easymotion-sn)
-omap / <Plug>(easymotion-tn)
+" nvim-tree file-explorer sidebar (replaces NERDTree)
+nnoremap <C-h> <cmd>NvimTreeToggle<CR>
 
-" These `n` & `N` mappings are options. You do not have to map `n` & `N` to EasyMotion.
-" Without these mappings, `n` & `N` works fine. (These mappings just provide
-" different highlight method and have some other features )
-map n <Plug>(easymotion-next)
-
-map N <Plug>(easymotion-prev)
-
-map <C-h> :NERDTreeToggle<CR>
-
-set statusline+=%#warningmsg#
-set statusline+=%{SyntasticStatuslineFlag()}
-set statusline+=%*
+" Telescope, CLion-style keybinds
+nnoremap <C-S-n> <cmd>Telescope find_files<CR>
+nnoremap <C-S-f> <cmd>Telescope live_grep<CR>
 
 " Config syntastic
 if has('nvim')
@@ -160,8 +153,6 @@ set foldnestmax=10
 set nofoldenable
 set foldlevel=2
 let g:jsx_ext_required = 0
-
-let g:ctrlp_custom_ignore = 'node_modules\|DS_Store\|git'
 
 let g:NERDSpaceDelims = 1
 nnoremap <C-c> :call NERDComment(0,"toggle")<CR>
@@ -242,3 +233,41 @@ cnoremap <Tab> <C-C><Esc>
 
 " Share clipboard (OSX)
 " set clipboard=unnamed
+
+lua << EOF
+require('hop').setup()
+require('nvim-autopairs').setup{}
+require('nvim-tree').setup{}
+require('lualine').setup{ options = { theme = 'auto' } }
+require('telescope').setup{
+  defaults = {
+    file_ignore_patterns = { 'node_modules', '%.git/', '%.DS_Store' },
+  },
+}
+
+-- LSP, auto-installed via Mason: pyright (Python), lua_ls (editing these configs)
+require('mason').setup()
+require('mason-lspconfig').setup{
+  ensure_installed = { 'pyright', 'lua_ls' },
+}
+
+-- CLion-style code navigation (needs a language server attached to work; :LspInfo to check)
+local on_attach = function(client, bufnr)
+  local opts = { buffer = bufnr, silent = true }
+  vim.keymap.set('n', '<C-b>', vim.lsp.buf.definition, opts)         -- Go to Declaration
+  vim.keymap.set('n', '<C-A-b>', vim.lsp.buf.implementation, opts)   -- Go to Implementation
+  vim.keymap.set('n', '<A-F7>', vim.lsp.buf.references, opts)        -- Find Usages
+  vim.keymap.set('n', '<S-F6>', vim.lsp.buf.rename, opts)            -- Rename
+  vim.keymap.set('n', '<C-q>', vim.lsp.buf.hover, opts)              -- Quick Documentation
+  vim.keymap.set('n', '<A-CR>', vim.lsp.buf.code_action, opts)       -- Show Intention Actions
+  vim.keymap.set('n', '<C-A-l>', function() vim.lsp.buf.format{ async = true } end, opts) -- Reformat Code
+  vim.keymap.set('n', '<F2>', vim.diagnostic.goto_next, opts)        -- Next Highlighted Error
+  vim.keymap.set('n', '<S-F2>', vim.diagnostic.goto_prev, opts)      -- Previous Highlighted Error
+  if client.supports_method('textDocument/completion') then
+    vim.lsp.completion.enable(true, client.id, bufnr, { autotrigger = true })
+  end
+end
+
+require('lspconfig').pyright.setup{ on_attach = on_attach }
+require('lspconfig').lua_ls.setup{ on_attach = on_attach }
+EOF
