@@ -2,9 +2,6 @@
   "env": {
     "PYTHONUTF8": "1"
   },
-  "permissions": {
-    "defaultMode": "bypassPermissions"
-  },
   "model": "claude-fable-5[1m]",
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
@@ -18,6 +15,5 @@
   },
   "autoUpdatesChannel": "latest",
   "tui": "fullscreen",
-  "skipDangerousModePermissionPrompt": true,
   "theme": "dark"
 }

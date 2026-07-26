@@ -50,10 +50,13 @@ def bootstrap():
     venv_dir = REPO / ".venv"
     venv_py = venv_dir / ("Scripts/python.exe" if PLATFORM == "windows" else "bin/python")
     if not venv_py.exists():
-        print("First run: creating .venv and installing UI dependencies ...")
+        print("First run: creating .venv ...")
         import venv as venv_mod
         venv_mod.create(venv_dir, with_pip=True)
-        subprocess.run([str(venv_py), "-m", "pip", "install", "--quiet", "rich", "questionary"], check=True)
+    # Unconditional: a failed/interrupted first install must not brick the venv
+    # forever; pip no-ops in a couple of seconds when both are already present.
+    print("Installing UI dependencies into .venv ...")
+    subprocess.run([str(venv_py), "-m", "pip", "install", "--quiet", "rich", "questionary"], check=True)
     env = dict(os.environ, ENV_SETUP_BOOTSTRAPPED="1")
     sys.exit(subprocess.call([str(venv_py), str(Path(__file__).resolve())] + sys.argv[1:], env=env))
 
@@ -117,15 +120,29 @@ def link_state(link: Path, target: Path):
     return "missing"
 
 
+def _same_content(a: Path, b: Path):
+    try:
+        return a.is_file() and b.is_file() and a.read_bytes() == b.read_bytes()
+    except OSError:
+        return False
+
+
 def ensure_symlink(target: Path, link: Path):
     """Symlink link -> target; on Windows without the privilege, copy instead."""
     if link_state(link, target) == "ok":
         return
     link.parent.mkdir(parents=True, exist_ok=True)
     if link.exists() or link.is_symlink():
-        backup = link.with_name(link.name + ".backup")
-        if not link.is_symlink() and not backup.exists():
-            shutil.copy2(link, backup)
+        # Back up any real file/dir whose content we'd otherwise lose - every
+        # time, under a fresh name, so re-runs can't silently destroy edits
+        # made to a copy-fallback file since the previous run.
+        if not link.is_symlink() and not _same_content(link, target):
+            backup = link.with_name(link.name + ".backup")
+            n = 1
+            while backup.exists():
+                n += 1
+                backup = link.with_name(f"{link.name}.backup{n}")
+            (shutil.copytree if link.is_dir() else shutil.copy2)(link, backup)
             console.print(f"  backed up {short(link)} -> {backup.name}")
         if link.is_dir() and not link.is_symlink():
             shutil.rmtree(link)
@@ -155,8 +172,24 @@ def combine(states):
 
 def download(url: str, dest: Path):
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with urllib.request.urlopen(url) as resp:
+    with urllib.request.urlopen(url, timeout=60) as resp:
         dest.write_bytes(resp.read())
+
+
+def load_jsonc(text: str):
+    """Windows Terminal settings are JSONC: strip // comments (string-aware,
+    so URLs survive) and trailing commas before parsing."""
+    lines = []
+    for line in text.splitlines():
+        in_string = False
+        for i, ch in enumerate(line):
+            if ch == '"' and (i == 0 or line[i - 1] != "\\"):
+                in_string = not in_string
+            elif not in_string and line[i:i + 2] == "//":
+                line = line[:i]
+                break
+        lines.append(line)
+    return json.loads(re.sub(r",(\s*[}\]])", r"\1", "\n".join(lines)))
 
 
 def nvim_version():
@@ -172,6 +205,19 @@ def wt_settings_path():
     hits = list((Path(os.environ.get("LOCALAPPDATA", "")) / "Packages").glob(
         "Microsoft.WindowsTerminal_*/LocalState/settings.json"))
     return hits[0] if hits else None
+
+
+_PS_PROFILE = None
+
+
+def ps_profile():
+    """Ask PowerShell for its real profile path - Documents may be OneDrive-redirected."""
+    global _PS_PROFILE
+    if _PS_PROFILE is None:
+        out = run(["powershell", "-NoProfile", "-Command", "$PROFILE"],
+                  capture=True, check=False).stdout.strip()
+        _PS_PROFILE = Path(out) if out else HOME / "Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1"
+    return _PS_PROFILE
 
 
 # --------------------------------------------------------------------------- #
@@ -244,17 +290,27 @@ class Packages(Component):
                 if shutil.which(binary):
                     continue
                 base = ["winget", "install", pkg, "--accept-package-agreements", "--accept-source-agreements"]
-                # user scope first where offered, to dodge UAC; fall back to default scope
+                # user scope first where offered, to dodge UAC; the retry runs
+                # with check=True so a real failure surfaces instead of a
+                # silent green "done"
                 result = run(base + extra, check=False)
-                if result.returncode != 0 and extra:
+                if result.returncode != 0:
                     run(base)
             refresh_windows_path()
         elif PLATFORM == "macos":
             for p in self.MACOS:
-                run(["brew", "install", p], check=False)
+                if run(["brew", "install", p], check=False).returncode != 0:
+                    console.print(f"  [yellow]brew could not install {p}[/]")
         else:
             run(["sudo", "apt-get", "update"])
-            run(["sudo", "apt-get", "install", "-y"] + self.LINUX)
+            # Per package: one unavailable name (e.g. eza on older Ubuntu/Debian)
+            # must not abort the entire transaction
+            failed = []
+            for p in self.LINUX:
+                if run(["sudo", "apt-get", "install", "-y", p], check=False).returncode != 0:
+                    failed.append(p)
+            if failed:
+                console.print(f"  [yellow]not installable here (skipped): {', '.join(failed)}[/]")
             # Debian/Ubuntu ship bat as batcat; expose it as bat
             batcat = shutil.which("batcat")
             if batcat:
@@ -281,9 +337,11 @@ class VimNvim(Component):
             links.append((vimrc, HOME / ".config/nvim/init.vim"))
         return links
 
-    def _autoload(self):
-        base = Path(os.environ["LOCALAPPDATA"]) / "nvim" if PLATFORM == "windows" else HOME / ".config/nvim"
-        return base / "autoload/plug.vim"
+    def _autoloads(self):
+        if PLATFORM == "windows":
+            return [Path(os.environ["LOCALAPPDATA"]) / "nvim/autoload/plug.vim"]
+        # plain vim reads ~/.vim, nvim reads ~/.config/nvim - provision both
+        return [HOME / ".config/nvim/autoload/plug.vim", HOME / ".vim/autoload/plug.vim"]
 
     def _mason_dir(self):
         return (Path(os.environ["LOCALAPPDATA"]) / "nvim-data" if PLATFORM == "windows"
@@ -296,7 +354,7 @@ class VimNvim(Component):
         items = [("nvim binary", "ok" if shutil.which("nvim") else "missing")]
         for target, link in self._links():
             items.append((f"{short(link)} -> {target.name}", link_state(link, target)))
-        items.append(("vim-plug", "ok" if self._autoload().exists() else "missing"))
+        items.append(("vim-plug", combine(["ok" if p.exists() else "missing" for p in self._autoloads()])))
         count = self._plugin_count()
         items.append((f"plugins installed ({count})", "ok" if count else "missing"))
         version = nvim_version()
@@ -313,13 +371,13 @@ class VimNvim(Component):
             raise RuntimeError("nvim not installed - run the system packages component first")
         for target, link in self._links():
             ensure_symlink(target, link)
-        autoload = self._autoload()
-        if not autoload.exists():
-            download("https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim", autoload)
-            console.print("  installed vim-plug")
+        for autoload in self._autoloads():
+            if not autoload.exists():
+                download("https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim", autoload)
+                console.print(f"  installed vim-plug -> {short(autoload)}")
         run(["nvim", "--headless", "+PlugInstall", "+qa"])
         # :PlugClean! is unreliable headlessly; prune undeclared plugins directly
-        declared = re.findall(r"Plug\s+'[^/]+/([^']+)'", (REPO / "vimrc").read_text())
+        declared = re.findall(r"Plug\s+'[^/]+/([^']+)'", (REPO / "vimrc").read_text(encoding="utf-8"))
         if self.PLUGGED.is_dir():
             for d in self.PLUGGED.iterdir():
                 if d.is_dir() and d.name not in declared:
@@ -348,8 +406,7 @@ class TerminalSetup(Component):
 
     def _links(self):
         if PLATFORM == "windows":
-            return [(REPO / "windows/Microsoft.PowerShell_profile.ps1",
-                     HOME / "Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1")]
+            return [(REPO / "windows/Microsoft.PowerShell_profile.ps1", ps_profile())]
         return [(REPO / "config/fish", HOME / ".config/fish")]
 
     def items(self):
@@ -367,7 +424,7 @@ class TerminalSetup(Component):
             if not settings_path:
                 items.append(("Windows Terminal", "missing"))
             else:
-                s = json.loads(settings_path.read_text(encoding="utf-8-sig"))
+                s = load_jsonc(settings_path.read_text(encoding="utf-8-sig"))
                 items.append(("Material Design color scheme",
                               "ok" if any(sc.get("name") == "Material Design" for sc in s.get("schemes", []))
                               else "missing"))
@@ -376,7 +433,7 @@ class TerminalSetup(Component):
                                           for cid, _, _ in self.NVIM_CHORDS) else "missing"))
         else:
             bashrc = HOME / ".bashrc"
-            hooked = bashrc.exists() and self.BASHRC_HOOK in bashrc.read_text()
+            hooked = bashrc.exists() and self.BASHRC_HOOK in bashrc.read_text(encoding="utf-8", errors="replace")
             items.append(("bashrc hook (julian_bash.sh)", "ok" if hooked else "missing"))
         return items
 
@@ -394,8 +451,8 @@ class TerminalSetup(Component):
             self._install_terminal_settings()
         else:
             bashrc = HOME / ".bashrc"
-            if not bashrc.exists() or self.BASHRC_HOOK not in bashrc.read_text():
-                with bashrc.open("a") as f:
+            if not bashrc.exists() or self.BASHRC_HOOK not in bashrc.read_text(encoding="utf-8", errors="replace"):
+                with bashrc.open("a", encoding="utf-8") as f:
                     f.write(f"\n{self.BASHRC_HOOK}\n")
 
     def _install_font(self):
@@ -424,13 +481,17 @@ class TerminalSetup(Component):
         if not settings_path:
             console.print("  [yellow]Windows Terminal not installed - skipping theme/keybinds[/]")
             return
-        s = json.loads(settings_path.read_text(encoding="utf-8-sig"))
-        scheme = json.loads((REPO / "windows/material-design.windowsterminal.json").read_text())
+        s = load_jsonc(settings_path.read_text(encoding="utf-8-sig"))
+        scheme = json.loads((REPO / "windows/material-design.windowsterminal.json").read_text(encoding="utf-8"))
         s.setdefault("schemes", [])
         s["schemes"] = [sc for sc in s["schemes"] if sc.get("name") != "Material Design"] + [scheme]
-        s.setdefault("profiles", {}).setdefault("defaults", {})
-        s["profiles"]["defaults"]["colorScheme"] = "Material Design"
-        s["profiles"]["defaults"]["font"] = {"face": "MesloLGM Nerd Font Mono"}
+        profiles = s.setdefault("profiles", {})
+        if isinstance(profiles, list):  # pre-1.0 Windows Terminal wrote "profiles" as a bare array
+            profiles = {"list": profiles}
+            s["profiles"] = profiles
+        defaults = profiles.setdefault("defaults", {})
+        defaults["colorScheme"] = "Material Design"
+        defaults["font"] = {"face": "MesloLGM Nerd Font Mono"}
         s.setdefault("actions", [])
         s.setdefault("keybindings", [])
         for cid, keys, seq in self.NVIM_CHORDS:
@@ -460,17 +521,25 @@ class ClaudeConfig(Component):
 
     def install(self):
         settings_link = HOME / ".claude/settings.json"
-        # Machine-specific statusLine must not follow the shared settings around:
-        # move it into settings.local.json (merged by Claude Code, stays local).
+        # Whatever the machine's real settings.json has that the shared repo file
+        # doesn't carry moves into settings.local.json (Claude Code merges it on
+        # top and it stays local) - replacing the file with the symlink must not
+        # lose statusLine, accumulated permissions, hooks, env, anything.
         if settings_link.exists() and not settings_link.is_symlink():
-            existing = json.loads(settings_link.read_text())
-            status_line = existing.pop("statusLine", None)
-            if status_line:
+            existing = json.loads(settings_link.read_text(encoding="utf-8"))
+            repo_settings = json.loads((REPO / "claude/settings.json").read_text(encoding="utf-8"))
+            extras = {k: v for k, v in existing.items() if repo_settings.get(k) != v}
+            if extras:
                 local_path = HOME / ".claude/settings.local.json"
-                local = json.loads(local_path.read_text()) if local_path.exists() else {}
-                local.setdefault("statusLine", status_line)
-                local_path.write_text(json.dumps(local, indent=2))
-                console.print("  moved machine-specific statusLine to settings.local.json")
+                local = json.loads(local_path.read_text(encoding="utf-8")) if local_path.exists() else {}
+                for key, value in extras.items():
+                    if isinstance(value, dict) and isinstance(local.get(key), dict):
+                        for sub_key, sub_value in value.items():
+                            local[key].setdefault(sub_key, sub_value)
+                    else:
+                        local.setdefault(key, value)
+                local_path.write_text(json.dumps(local, indent=2), encoding="utf-8")
+                console.print(f"  moved machine-local settings to settings.local.json: {', '.join(extras)}")
         for target, link in self._links():
             ensure_symlink(target, link)
 

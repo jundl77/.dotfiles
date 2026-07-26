@@ -35,7 +35,7 @@ if has('nvim')
   Plug 'williamboman/mason.nvim'              " auto-installs language servers
   Plug 'williamboman/mason-lspconfig.nvim'
 else
-  Plug 'preservim/syntastic'
+  Plug 'vim-syntastic/syntastic'
   Plug 'ycm-core/YouCompleteMe'
 endif
 
