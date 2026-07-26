@@ -58,7 +58,6 @@ let mapleader=","
 syntax on
 set number
 set cursorline
-set cursorcolumn
 nnoremap <Tab> :bnext<CR>
 nnoremap <S-Tab> :bprevious<CR>
 map q: <Nop>
@@ -93,9 +92,6 @@ if has('persistent_undo')
     set undofile
 endif
 
-highlight CursorColumn ctermfg=none ctermbg=23 cterm=bold guifg=white guibg=darkgrey gui=bold
-autocmd InsertEnter * highlight CursorColumn ctermfg=none ctermbg=none cterm=bold guifg=white guibg=yellow gui=bold
-autocmd InsertLeave * highlight CursorColumn ctermfg=none ctermbg=23 cterm=bold guifg=Black guibg=yellow gui=NONE
 autocmd BufWritePre *.ts{x} :%s/\s\+$//e
 
 highlight OverLength ctermbg=red ctermfg=white guibg=#592929
