@@ -552,44 +552,44 @@ def main():
         print_status(gather_status())
         sys.exit(0 if ok else 1)
 
+    marks = {"ok": "OK", "partial": " ~", "missing": " X"}
     expanded = set()
     status = gather_status()
     while True:
         console.clear()
-        console.print("[bold]env_setup[/] - deploy the dev setup\n")
-        print_status(status, expanded)
+        console.print(f"[bold]env_setup[/] - dotfiles on {PLATFORM}\n")
         missing = [c for c, state, _, _ in status if state != "ok"]
+        width = max(len(c.name) for c, _, _, _ in status) + 2
 
         choices = []
         if missing:
             choices.append(questionary.Choice(f"Install everything missing ({len(missing)})", value="all"))
-        for c, state, _, _ in status:
+        for c, state, detail, items in status:
             arrow = "v" if c.name in expanded else ">"
-            choices.append(questionary.Choice(f"{arrow} {c.name}", value=("toggle", c)))
-            if c.name in expanded and state != "ok":
-                choices.append(questionary.Choice(f"     install {c.name}", value=("install", c)))
+            choices.append(questionary.Choice(
+                f"{marks[state]} {arrow} {c.name:<{width}} {detail}", value=("toggle", c)))
+            if c.name in expanded:
+                for label, istate in items:
+                    choices.append(questionary.Separator(f"     {marks[istate]}   {label}"))
+                if state != "ok":
+                    choices.append(questionary.Choice(f"        install {c.name}", value=("install", c)))
         choices.append(questionary.Choice("Refresh", value="refresh"))
         choices.append(questionary.Choice("Quit", value="quit"))
-        answer = questionary.select("Select a component to expand/collapse it:", choices=choices).ask()
+        answer = questionary.select("Enter expands a component / runs an action:", choices=choices).ask()
 
         if answer is None or answer == "quit":
             return
         if answer == "refresh":
             status = gather_status()
             continue
-        if answer == "all":
-            for c in missing:
-                install_component(c)
-            questionary.press_any_key_to_continue().ask()
-            status = gather_status()
+        if isinstance(answer, tuple) and answer[0] == "toggle":
+            expanded ^= {answer[1].name}
             continue
-        action, component = answer
-        if action == "toggle":
-            expanded ^= {component.name}
-        else:
-            install_component(component)
-            questionary.press_any_key_to_continue().ask()
-            status = gather_status()
+        targets = missing if answer == "all" else [answer[1]]
+        for c in targets:
+            install_component(c)
+        questionary.press_any_key_to_continue().ask()
+        status = gather_status()
 
 
 if __name__ == "__main__":
