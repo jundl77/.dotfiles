@@ -3,6 +3,11 @@
     "PYTHONUTF8": "1"
   },
   "model": "claude-fable-5[1m]",
+  "statusLine": {
+    "type": "command",
+    "command": "python -m claude_statusbar.cli render",
+    "refreshInterval": 1
+  },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
