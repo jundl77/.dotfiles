@@ -42,6 +42,10 @@ install_windows_terminal_theme() {
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "${DOTFILES_DIR}/windows/install-terminal-theme.ps1")"
 }
 
+install_windows_neovim() {
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "${DOTFILES_DIR}/windows/install-neovim.ps1")"
+}
+
 case "$OS" in
     macos|linux)
         echo "==> Installing: Git identity + aliases"
@@ -59,6 +63,9 @@ case "$OS" in
         echo
         echo "==> Installing: Windows Terminal font + Material Design color scheme"
         install_windows_terminal_theme
+        echo
+        echo "==> Installing: Neovim + vim config"
+        install_windows_neovim
         ;;
 esac
 

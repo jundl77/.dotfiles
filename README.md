@@ -19,11 +19,15 @@ only takes effect for new shell sessions (sign out/in or reboot first).
 ### macOS / Linux
 
 Falls through to the existing dotbot-based `./install`, which symlinks the dotfiles and
-installs `eza`/`lnav`/`bat`/`ripgrep`/`highlight`/`vim`/`neovim`/`grc` via brew on macOS
-or apt on Linux (no brew needed on Linux), plus:
+installs `eza`/`lnav`/`bat`/`ripgrep`/`highlight`/`vim`/`neovim`/`grc`/`node` via brew on
+macOS or apt on Linux (no brew needed on Linux; `node` is required by Mason to install
+`pyright` — see below), plus:
 
 - open vim/nvim and run ```:PlugInstall```
 - YouCompleteMe needs a one-time native build: `~/.vim/plugged/YouCompleteMe/install.py --clangd-completer`
+- The LSP features need nvim 0.11+; apt on Ubuntu/Debian ships an older neovim, on which the
+  vimrc silently skips the LSP section (everything else still works). Install a current nvim
+  (snap/appimage/PPA) to get them on Linux.
 
 ### Windows
 
@@ -36,6 +40,23 @@ or apt on Linux (no brew needed on Linux), plus:
   prompt) and registers the color scheme as the default for all Windows Terminal profiles
 - `windows/link-profile.ps1` - symlinks the profile into place and sets the CurrentUser
   script execution policy to RemoteSigned (both required for the profile to load)
+- `windows/install-neovim.ps1` - installs Neovim, ripgrep, and Node.js via winget, symlinks
+  `vimrc` as `init.vim`, and runs `:PlugInstall` + Mason's language-server install headlessly
+
+### vimrc (all platforms)
+
+CLion-flavored: Telescope for Go to File / Find in Path (`Ctrl+Shift+N`/`Ctrl+Shift+F`,
+laid out like CLion's dialog — prompt on top, matches, preview editor below; `,fd` greps
+an arbitrary directory instead of the cwd; many terminals can't transmit Ctrl+Shift
+chords and Windows Terminal grabs `Ctrl+Shift+F` for its own find, so `Ctrl+P`, `,ff`
+and `,fg` work everywhere as fallbacks),
+`nvim-tree.lua` as a file-explorer sidebar (`Ctrl+H`), and `nvim-lspconfig` + `mason.nvim`
+(auto-installs `pyright` + `lua_ls`) for Go to Declaration/Implementation (`Ctrl+B`/
+`Ctrl+Alt+B`), Find Usages (`Alt+F7`), Rename (`Shift+F6`), Quick Documentation (`Ctrl+Q`),
+Show Intention Actions (`Alt+Enter`), Reformat Code (`Ctrl+Alt+L`), and next/previous
+highlighted error (`F2`/`Shift+F2`). `Ctrl+D` (duplicate line) and `Ctrl+/` (comment) were
+deliberately left off since they collide with vim's native scroll and this repo's existing
+`Ctrl+C` comment-toggle binding.
 
 ## Dependencies:
 
@@ -43,4 +64,6 @@ or apt on Linux (no brew needed on Linux), plus:
 - brew (macOS)
 - apt-based distro, e.g. Ubuntu/Debian/WSL (Linux)
 - Windows Terminal (Windows)
+- ripgrep + Node.js (Telescope live_grep and Mason's pyright install, respectively —
+  installed automatically by `./install`/`./install.sh` on every platform)
 

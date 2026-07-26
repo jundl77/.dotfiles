@@ -1,4 +1,8 @@
-set shell=bash
+" bash is not a usable shell on Windows (missing, or resolves to WSL's
+" System32 bash.exe), which would break system() and :! there
+if !has('win32')
+  set shell=bash
+endif
 
 set nocompatible              " be iMproved, required
 filetype off                  " required
@@ -12,21 +16,25 @@ endif
 
 " Plugins for neovim and vim
 Plug 'scrooloose/nerdcommenter'
-Plug 'easymotion/vim-easymotion'
-Plug 'Shougo/vimproc.vim'
 Plug 'nvie/vim-flake8'
-Plug 'bling/vim-airline'
-Plug 'vim-airline/vim-airline-themes'
 Plug 'tpope/vim-repeat'
-Plug 'terryma/vim-multiple-cursors'
+Plug 'mg979/vim-visual-multi'               " replaces terryma/vim-multiple-cursors (unmaintained)
 Plug 'kana/vim-submode'
-Plug 'ctrlpvim/ctrlp.vim'
-Plug 'Raimondi/delimitMate'
 Plug 'rhysd/vim-grammarous'
 Plug 'reedes/vim-wordy'
 
-" Install vim or neovim specific plugins
+" Install vim or neovim specific plugins (the Lua plugins cannot load in plain vim)
 if has('nvim')
+  Plug 'smoka7/hop.nvim'                      " replaces easymotion/vim-easymotion (unmaintained)
+  Plug 'nvim-lualine/lualine.nvim'            " replaces bling/vim-airline (unmaintained)
+  Plug 'nvim-tree/nvim-web-devicons'
+  Plug 'nvim-lua/plenary.nvim'
+  Plug 'nvim-telescope/telescope.nvim'        " replaces ctrlpvim/ctrlp.vim (old, no live-grep)
+  Plug 'nvim-tree/nvim-tree.lua'              " file-explorer sidebar, replaces NERDTree
+  Plug 'windwp/nvim-autopairs'                " replaces Raimondi/delimitMate (unmaintained)
+  Plug 'neovim/nvim-lspconfig'                " CLion-style go-to-def/rename/find-usages
+  Plug 'williamboman/mason.nvim'              " auto-installs language servers
+  Plug 'williamboman/mason-lspconfig.nvim'
   Plug 'neomake/neomake'
 else
   Plug 'scrooloose/syntastic'
@@ -50,7 +58,6 @@ let mapleader=","
 syntax on
 set number
 set cursorline
-set cursorcolumn
 nnoremap <Tab> :bnext<CR>
 nnoremap <S-Tab> :bprevious<CR>
 map q: <Nop>
@@ -77,16 +84,14 @@ let &runtimepath.=','.vimDir
 " Keep undo history across sessions by storing it in a file
 if has('persistent_undo')
     let myUndoDir = expand(vimDir . '/undodir')
-    " Create dirs
-    call system('mkdir ' . vimDir)
-    call system('mkdir ' . myUndoDir)
+    " Native mkdir() instead of system('mkdir'): works on Windows too, where
+    " shelling out to a unix mkdir is not available
+    call mkdir(expand(vimDir), 'p')
+    call mkdir(myUndoDir, 'p')
     let &undodir = myUndoDir
     set undofile
 endif
 
-highlight CursorColumn ctermfg=none ctermbg=23 cterm=bold guifg=white guibg=darkgrey gui=bold
-autocmd InsertEnter * highlight CursorColumn ctermfg=none ctermbg=none cterm=bold guifg=white guibg=yellow gui=bold
-autocmd InsertLeave * highlight CursorColumn ctermfg=none ctermbg=23 cterm=bold guifg=Black guibg=yellow gui=NONE
 autocmd BufWritePre *.ts{x} :%s/\s\+$//e
 
 highlight OverLength ctermbg=red ctermfg=white guibg=#592929
@@ -97,29 +102,33 @@ highlight Folded ctermbg=darkgrey guibg=darkgrey
 
 set backspace=indent,eol,start
 
-let g:airline#extensions#tabline#enabled = 1
-let g:airline#extensions#tabline#fnamemod = ':t'
 set laststatus=2
 
-let g:EasyMotion_do_mapping = 0 " Disable default mappings
-let g:EasyMotion_smartcase = 1
+" Native /, n, N restored (easymotion previously remapped them); keep the
+" smartcase behavior easymotion's search used to provide
+set ignorecase
+set smartcase
 
-" Gif config
-map  / <Plug>(easymotion-sn)
-omap / <Plug>(easymotion-tn)
+if has('nvim')
+  " hop.nvim jump-to-match (replaces easymotion)
+  nnoremap s <cmd>HopChar2<CR>
+  nnoremap S <cmd>HopWord<CR>
 
-" These `n` & `N` mappings are options. You do not have to map `n` & `N` to EasyMotion.
-" Without these mappings, `n` & `N` works fine. (These mappings just provide
-" different highlight method and have some other features )
-map n <Plug>(easymotion-next)
+  " nvim-tree file-explorer sidebar (replaces NERDTree)
+  nnoremap <C-h> <cmd>NvimTreeToggle<CR>
 
-map N <Plug>(easymotion-prev)
-
-map <C-h> :NERDTreeToggle<CR>
-
-set statusline+=%#warningmsg#
-set statusline+=%{SyntasticStatuslineFlag()}
-set statusline+=%*
+  " Telescope, CLion-style keybinds. Many terminals (Terminal.app, default
+  " tmux) cannot transmit Ctrl+Shift chords, and Windows Terminal grabs
+  " Ctrl+Shift+F for its own find, so <C-p> (the old ctrlp key) and
+  " <leader>ff / <leader>fg work everywhere as fallbacks.
+  nnoremap <C-S-n> <cmd>Telescope find_files<CR>
+  nnoremap <C-S-f> <cmd>Telescope live_grep<CR>
+  nnoremap <C-p> <cmd>Telescope find_files<CR>
+  nnoremap <leader>ff <cmd>Telescope find_files<CR>
+  nnoremap <leader>fg <cmd>Telescope live_grep<CR>
+  " grep in an arbitrary directory instead of the cwd (prompts for the path)
+  nnoremap <leader>fd <cmd>lua GrepInPath()<CR>
+endif
 
 " Config syntastic
 if has('nvim')
@@ -149,7 +158,10 @@ set expandtab
 set shiftwidth=2
 set smartindent
 set autoindent
-set pastetoggle=<f5>
+try
+  set pastetoggle=<f5>
+catch
+endtry
 set hidden
 set mouse=a
 set foldmethod=indent
@@ -158,7 +170,13 @@ set nofoldenable
 set foldlevel=2
 let g:jsx_ext_required = 0
 
-let g:ctrlp_custom_ignore = 'node_modules\|DS_Store\|git'
+" Multi-cursor is opt-in only: no default Ctrl+N / Ctrl+arrow grabs.
+" <leader>m on a word starts it (then: n = next occurrence, q = skip,
+" Q = remove cursor, Tab = cursor/extend mode, Esc = exit).
+let g:VM_default_mappings = 0
+let g:VM_maps = {}
+let g:VM_maps['Find Under'] = '<leader>m'
+let g:VM_maps['Find Subword Under'] = '<leader>m'
 
 let g:NERDSpaceDelims = 1
 nnoremap <C-c> :call NERDComment(0,"toggle")<CR>
@@ -239,3 +257,96 @@ cnoremap <Tab> <C-C><Esc>
 
 " Share clipboard (OSX)
 " set clipboard=unnamed
+
+if has('nvim')
+lua << EOF
+-- pcall every require: on the very first launch none of these plugins exist
+-- yet (the installers run nvim headlessly against this exact config to
+-- bootstrap :PlugInstall), and a missing plugin must not abort the chunk.
+local function try(mod)
+  local ok, m = pcall(require, mod)
+  return ok and m or nil
+end
+
+local hop = try('hop')
+if hop then hop.setup() end
+local autopairs = try('nvim-autopairs')
+if autopairs then autopairs.setup{} end
+local tree = try('nvim-tree')
+if tree then tree.setup{} end
+local lualine = try('lualine')
+if lualine then lualine.setup{ options = { theme = 'auto' } } end
+local telescope = try('telescope')
+if telescope then
+  telescope.setup{
+    defaults = {
+      file_ignore_patterns = { 'node_modules', '%.git/', '%.DS_Store' },
+      -- CLion Find-in-Path shape: prompt on top, matches under it, preview
+      -- editor at the bottom (default telescope puts the preview beside)
+      layout_strategy = 'vertical',
+      sorting_strategy = 'ascending',
+      layout_config = {
+        vertical = {
+          width = 0.85,
+          height = 0.9,
+          preview_height = 0.45,
+          prompt_position = 'top',
+          mirror = true,
+        },
+      },
+    },
+  }
+  -- CLion's Find in Path can target any directory, not just the cwd:
+  -- prompts for a path (tab-completes), then live-greps inside it.
+  _G.GrepInPath = function()
+    vim.ui.input(
+      { prompt = 'Search in dir: ', default = vim.fn.getcwd(), completion = 'dir' },
+      function(dir)
+        if dir and dir ~= '' then
+          require('telescope.builtin').live_grep({ search_dirs = { dir } })
+        end
+      end
+    )
+  end
+end
+
+-- LSP needs nvim 0.11+: vim.lsp.config/enable and vim.lsp.completion don't
+-- exist before that, and mason-lspconfig v2 refuses to load there (apt ships
+-- 0.9 or older on Ubuntu/Debian). Skip the whole section on old nvim instead
+-- of erroring on every launch.
+if vim.fn.has('nvim-0.11') == 1 then
+  -- Auto-installed via Mason: pyright (Python), lua_ls (editing these configs)
+  local mason = try('mason')
+  local mason_lspconfig = try('mason-lspconfig')
+  if mason and mason_lspconfig then
+    mason.setup()
+    mason_lspconfig.setup{
+      ensure_installed = { 'pyright', 'lua_ls' },
+    }
+
+    -- CLion-style code navigation (needs a language server attached to work; :LspInfo to check)
+    local on_attach = function(client, bufnr)
+      local opts = { buffer = bufnr, silent = true }
+      vim.keymap.set('n', '<C-b>', vim.lsp.buf.definition, opts)         -- Go to Declaration
+      vim.keymap.set('n', '<C-A-b>', vim.lsp.buf.implementation, opts)   -- Go to Implementation
+      vim.keymap.set('n', '<A-F7>', vim.lsp.buf.references, opts)        -- Find Usages
+      vim.keymap.set('n', '<S-F6>', vim.lsp.buf.rename, opts)            -- Rename
+      vim.keymap.set('n', '<C-q>', vim.lsp.buf.hover, opts)              -- Quick Documentation
+      vim.keymap.set('n', '<A-CR>', vim.lsp.buf.code_action, opts)       -- Show Intention Actions
+      vim.keymap.set('n', '<C-A-l>', function() vim.lsp.buf.format{ async = true } end, opts) -- Reformat Code
+      vim.keymap.set('n', '<F2>', vim.diagnostic.goto_next, opts)        -- Next Highlighted Error
+      vim.keymap.set('n', '<S-F2>', vim.diagnostic.goto_prev, opts)      -- Previous Highlighted Error
+      if client:supports_method('textDocument/completion') then
+        vim.lsp.completion.enable(true, client.id, bufnr, { autotrigger = true })
+      end
+    end
+
+    -- nvim-lspconfig still ships the default per-server configs vim.lsp.config() merges with;
+    -- vim.lsp.config/enable is the native nvim 0.11+ API replacing require('lspconfig').X.setup{}
+    vim.lsp.config('pyright', { on_attach = on_attach })
+    vim.lsp.config('lua_ls', { on_attach = on_attach })
+    vim.lsp.enable({ 'pyright', 'lua_ls' })
+  end
+end
+EOF
+endif
