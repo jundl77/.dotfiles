@@ -1,11 +1,6 @@
 # Global instructions
 
-These apply to every project on every machine (symlinked to `~/.claude/CLAUDE.md`
-by `env_setup.py` in my dotfiles).
-
-- I'm Julian. My dotfiles live at `~/.dotfiles` (github.com/jundl77/.dotfiles);
-  shell/editor/terminal config questions usually trace back there.
-- All changes to repos go through pull requests, never direct commits to the
-  default branch.
-- Prefer simple solutions: fewer moving parts beats clever. Ask before adding
-  new dependencies or services.
+- Prefer simple solutions. Fewer moving parts beats clever; ask before adding
+  dependencies, services, or abstraction layers.
+- Comments must be high-signal: precise, concrete, to the point. Explain *why*,
+  not *what* the next line does. No babble, no restating the code.

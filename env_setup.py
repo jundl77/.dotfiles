@@ -144,6 +144,15 @@ def ensure_symlink(target: Path, link: Path):
         return "copy"
 
 
+def combine(states):
+    """Roll sub-check states into one component state."""
+    if all(s == "ok" for s in states):
+        return "ok"
+    if all(s == "missing" for s in states):
+        return "missing"
+    return "partial"
+
+
 def download(url: str, dest: Path):
     dest.parent.mkdir(parents=True, exist_ok=True)
     with urllib.request.urlopen(url) as resp:
@@ -171,8 +180,7 @@ def wt_settings_path():
 # --------------------------------------------------------------------------- #
 
 class GitIdentity:
-    name = "git identity + aliases"
-    platforms = ("windows", "macos", "linux")
+    name = "git"
 
     def detect(self):
         try:
@@ -192,11 +200,10 @@ class GitIdentity:
 
 
 class Packages:
-    name = "packages"
-    platforms = ("windows", "macos", "linux")
+    name = "system packages"
 
-    WINDOWS = [  # (binary, winget id, extra args)
-        ("nvim", "Neovim.Neovim", []),
+    WINDOWS = [  # (binary, winget id, extra args) - node is needed by Mason for pyright
+        ("nvim", "Neovim.Neovim", ["--scope", "user"]),
         ("rg", "BurntSushi.ripgrep.MSVC", []),
         ("node", "OpenJS.NodeJS.LTS", ["--scope", "user"]),
     ]
@@ -244,9 +251,16 @@ class Packages:
                 (bindir / "bat").symlink_to(batcat)
 
 
-class ShellConfig:
-    name = "shell config"
-    platforms = ("windows", "macos", "linux")
+class TerminalSetup:
+    """Shell config everywhere; on Windows also the whole terminal look & keybinds."""
+    name = "terminal setup"
+
+    FONT_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft/Windows/Fonts"
+    FONT_FACES = ["Regular", "Bold", "Italic", "BoldItalic"]
+    NVIM_CHORDS = [  # CSI-u encodings nvim parses natively; WT can't send Ctrl+Shift otherwise
+        ("User.nvimFindInPath", "ctrl+shift+f", "\x1b[102;6u"),
+        ("User.nvimGotoFile", "ctrl+shift+n", "\x1b[110;6u"),
+    ]
 
     def _links(self):
         if PLATFORM == "windows":
@@ -254,17 +268,39 @@ class ShellConfig:
                      HOME / "Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1")]
         return [(REPO / "config/fish", HOME / ".config/fish")]
 
+    def _font_ok(self):
+        return (self.FONT_DIR / "MesloLGMNerdFontMono-Regular.ttf").exists()
+
     def detect(self):
-        states = [link_state(link, target) for target, link in self._links()]
-        if PLATFORM != "windows":
+        states, problems = [], []
+        for target, link in self._links():
+            s = link_state(link, target)
+            states.append(s)
+            if s != "ok":
+                problems.append("profile copied, not symlinked" if s == "copy" else "profile not linked")
+        if PLATFORM == "windows":
+            settings_path = wt_settings_path()
+            if not settings_path:
+                return "missing", "Windows Terminal not installed"
+            s = json.loads(settings_path.read_text(encoding="utf-8-sig"))
+            for ok, label in [
+                (self._font_ok(), "font"),
+                (any(sc.get("name") == "Material Design" for sc in s.get("schemes", [])), "theme"),
+                (all(any(a.get("id") == cid for a in s.get("actions", []))
+                     for cid, _, _ in self.NVIM_CHORDS), "keybinds"),
+            ]:
+                states.append("ok" if ok else "missing")
+                if not ok:
+                    problems.append(f"{label} missing")
+        else:
             bashrc = HOME / ".bashrc"
             hook = "source ~/.dotfiles/julian_bash.sh"
-            states.append("ok" if bashrc.exists() and hook in bashrc.read_text() else "missing")
-        if all(s == "ok" for s in states):
-            return "ok", "linked"
-        if any(s != "missing" for s in states):
-            return "partial", "copied, not symlinked" if "copy" in states else "incomplete"
-        return "missing", "not set up"
+            hooked = bashrc.exists() and hook in bashrc.read_text()
+            states.append("ok" if hooked else "missing")
+            if not hooked:
+                problems.append("bashrc hook missing")
+        state = combine(states)
+        return state, "configured" if state == "ok" else ", ".join(problems)
 
     def install(self):
         for target, link in self._links():
@@ -276,6 +312,8 @@ class ShellConfig:
                 run(["powershell", "-NoProfile", "-Command",
                      "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force"])
                 console.print("  execution policy set to RemoteSigned")
+            self._install_font()
+            self._install_terminal_settings()
         else:
             bashrc = HOME / ".bashrc"
             hook = "source ~/.dotfiles/julian_bash.sh"
@@ -283,10 +321,53 @@ class ShellConfig:
                 with bashrc.open("a") as f:
                     f.write(f"\n{hook}\n")
 
+    def _install_font(self):
+        if self._font_ok():
+            return
+        console.print("  downloading Meslo Nerd Font (~30 MB) ...")
+        import winreg
+        import zipfile
+        zip_path = REPO / ".venv/Meslo.zip"
+        download("https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Meslo.zip", zip_path)
+        self.FONT_DIR.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(zip_path) as zf:
+            for face in self.FONT_FACES:
+                fname = f"MesloLGMNerdFontMono-{face}.ttf"
+                (self.FONT_DIR / fname).write_bytes(zf.read(fname))
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                    r"Software\Microsoft\Windows NT\CurrentVersion\Fonts",
+                                    0, winreg.KEY_SET_VALUE) as k:
+                    winreg.SetValueEx(k, f"MesloLGM Nerd Font Mono {face} (TrueType)",
+                                      0, winreg.REG_SZ, str(self.FONT_DIR / fname))
+        zip_path.unlink()
+        console.print("  font installed (restart Windows Terminal to pick it up)")
 
-class EditorConfig:
-    name = "vim/nvim config"
-    platforms = ("windows", "macos", "linux")
+    def _install_terminal_settings(self):
+        settings_path = wt_settings_path()
+        s = json.loads(settings_path.read_text(encoding="utf-8-sig"))
+        scheme = json.loads((REPO / "windows/material-design.windowsterminal.json").read_text())
+        s.setdefault("schemes", [])
+        s["schemes"] = [sc for sc in s["schemes"] if sc.get("name") != "Material Design"] + [scheme]
+        s.setdefault("profiles", {}).setdefault("defaults", {})
+        s["profiles"]["defaults"]["colorScheme"] = "Material Design"
+        s["profiles"]["defaults"]["font"] = {"face": "MesloLGM Nerd Font Mono"}
+        s.setdefault("actions", [])
+        s.setdefault("keybindings", [])
+        for cid, keys, seq in self.NVIM_CHORDS:
+            s["actions"] = [a for a in s["actions"] if a.get("id") != cid]
+            s["actions"].append({"command": {"action": "sendInput", "input": seq}, "id": cid})
+            s["keybindings"] = [b for b in s["keybindings"] if b.get("keys") != keys]
+            s["keybindings"].append({"id": cid, "keys": keys})
+        settings_path.write_text(json.dumps(s, indent=4), encoding="utf-8")
+        console.print("  Windows Terminal settings updated")
+
+
+class VimNvim:
+    """Everything editor: config symlinks, plugins, LSP servers."""
+    name = "vim/nvim"
+
+    PLUGGED = HOME / ".config/nvim/plugged"
+    LSP_SERVERS = ["pyright", "lua-language-server"]
 
     def _links(self):
         vimrc = REPO / "vimrc"
@@ -298,26 +379,6 @@ class EditorConfig:
             links.append((vimrc, HOME / ".config/nvim/init.vim"))
         return links
 
-    def detect(self):
-        states = [link_state(link, target) for target, link in self._links()]
-        if all(s == "ok" for s in states):
-            return "ok", "linked"
-        if any(s != "missing" for s in states):
-            return "partial", "copied, not symlinked" if "copy" in states else "incomplete"
-        return "missing", "not set up"
-
-    def install(self):
-        for target, link in self._links():
-            ensure_symlink(target, link)
-
-
-class NeovimPlugins:
-    name = "nvim plugins + LSP servers"
-    platforms = ("windows", "macos", "linux")
-
-    PLUGGED = HOME / ".config/nvim/plugged"
-    LSP_SERVERS = ["pyright", "lua-language-server"]
-
     def _autoload(self):
         base = Path(os.environ["LOCALAPPDATA"]) / "nvim" if PLATFORM == "windows" else HOME / ".config/nvim"
         return base / "autoload/plug.vim"
@@ -328,18 +389,36 @@ class NeovimPlugins:
         return [s for s in self.LSP_SERVERS if not (mason / s).exists()]
 
     def detect(self):
+        states, problems = [], []
         if not shutil.which("nvim"):
-            return "missing", "nvim not installed"
-        if not self._autoload().exists():
-            return "missing", "vim-plug not installed"
-        if not self.PLUGGED.is_dir() or not any(self.PLUGGED.iterdir()):
-            return "partial", "plugins not installed"
-        missing = self._mason_missing()
-        if missing and nvim_version() and nvim_version() >= (0, 11):
-            return "partial", "LSP servers missing: " + ", ".join(missing)
-        return "ok", f"{len(list(self.PLUGGED.iterdir()))} plugins"
+            return "missing", "nvim not installed (run system packages first)"
+        for target, link in self._links():
+            s = link_state(link, target)
+            states.append(s)
+            if s != "ok":
+                problems.append(f"{link.name} " + ("copied, not symlinked" if s == "copy" else "not linked"))
+        plug_ok = self._autoload().exists()
+        plugins_ok = self.PLUGGED.is_dir() and any(self.PLUGGED.iterdir())
+        states += ["ok" if plug_ok else "missing", "ok" if plugins_ok else "missing"]
+        if not plug_ok:
+            problems.append("vim-plug missing")
+        elif not plugins_ok:
+            problems.append("plugins not installed")
+        version = nvim_version()
+        if version and version >= (0, 11):
+            mason_missing = self._mason_missing()
+            states.append("ok" if not mason_missing else "missing")
+            if mason_missing:
+                problems.append("LSP servers missing: " + ", ".join(mason_missing))
+        state = combine(states)
+        detail = f"{len(list(self.PLUGGED.iterdir()))} plugins" if state == "ok" else ", ".join(problems)
+        return state, detail
 
     def install(self):
+        if not shutil.which("nvim"):
+            raise RuntimeError("nvim not installed - run the system packages component first")
+        for target, link in self._links():
+            ensure_symlink(target, link)
         autoload = self._autoload()
         if not autoload.exists():
             download("https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim", autoload)
@@ -360,76 +439,8 @@ class NeovimPlugins:
             console.print("  [yellow]nvim < 0.11: skipping LSP servers (vimrc skips LSP there too)[/]")
 
 
-class WindowsTerminal:
-    name = "Windows Terminal font + theme + keybinds"
-    platforms = ("windows",)
-
-    FONT_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft/Windows/Fonts"
-    FONT_FACES = ["Regular", "Bold", "Italic", "BoldItalic"]
-    NVIM_CHORDS = [  # CSI-u encodings nvim parses natively; WT can't send Ctrl+Shift otherwise
-        ("User.nvimFindInPath", "ctrl+shift+f", "\x1b[102;6u"),
-        ("User.nvimGotoFile", "ctrl+shift+n", "\x1b[110;6u"),
-    ]
-
-    def _font_ok(self):
-        return (self.FONT_DIR / "MesloLGMNerdFontMono-Regular.ttf").exists()
-
-    def detect(self):
-        settings_path = wt_settings_path()
-        if not settings_path:
-            return "missing", "Windows Terminal not installed"
-        s = json.loads(settings_path.read_text(encoding="utf-8-sig"))
-        theme_ok = any(sc.get("name") == "Material Design" for sc in s.get("schemes", []))
-        chords_ok = all(any(a.get("id") == cid for a in s.get("actions", []))
-                        for cid, _, _ in self.NVIM_CHORDS)
-        if self._font_ok() and theme_ok and chords_ok:
-            return "ok", "configured"
-        if theme_ok or self._font_ok():
-            return "partial", "incomplete"
-        return "missing", "not configured"
-
-    def install(self):
-        if not self._font_ok():
-            console.print("  downloading Meslo Nerd Font (~30 MB) ...")
-            import zipfile
-            zip_path = REPO / ".venv/Meslo.zip"
-            download("https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Meslo.zip", zip_path)
-            self.FONT_DIR.mkdir(parents=True, exist_ok=True)
-            import winreg
-            with zipfile.ZipFile(zip_path) as zf:
-                for face in self.FONT_FACES:
-                    fname = f"MesloLGMNerdFontMono-{face}.ttf"
-                    (self.FONT_DIR / fname).write_bytes(zf.read(fname))
-                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                                        r"Software\Microsoft\Windows NT\CurrentVersion\Fonts",
-                                        0, winreg.KEY_SET_VALUE) as k:
-                        winreg.SetValueEx(k, f"MesloLGM Nerd Font Mono {face} (TrueType)",
-                                          0, winreg.REG_SZ, str(self.FONT_DIR / fname))
-            zip_path.unlink()
-            console.print("  font installed (restart Windows Terminal to pick it up)")
-
-        settings_path = wt_settings_path()
-        s = json.loads(settings_path.read_text(encoding="utf-8-sig"))
-        scheme = json.loads((REPO / "windows/material-design.windowsterminal.json").read_text())
-        s.setdefault("schemes", [])
-        s["schemes"] = [sc for sc in s["schemes"] if sc.get("name") != "Material Design"] + [scheme]
-        s.setdefault("profiles", {}).setdefault("defaults", {})
-        s["profiles"]["defaults"]["colorScheme"] = "Material Design"
-        s["profiles"]["defaults"]["font"] = {"face": "MesloLGM Nerd Font Mono"}
-        s.setdefault("actions", [])
-        s.setdefault("keybindings", [])
-        for cid, keys, seq in self.NVIM_CHORDS:
-            s["actions"] = [a for a in s["actions"] if a.get("id") != cid]
-            s["actions"].append({"command": {"action": "sendInput", "input": seq}, "id": cid})
-            s["keybindings"] = [b for b in s["keybindings"] if b.get("keys") != keys]
-            s["keybindings"].append({"id": cid, "keys": keys})
-        settings_path.write_text(json.dumps(s, indent=4), encoding="utf-8")
-        console.print("  Windows Terminal settings updated")
-
-
 class ClaudeConfig:
-    name = "claude config"
-    platforms = ("windows", "macos", "linux")
+    name = "claude"
 
     def _links(self):
         return [
@@ -439,11 +450,10 @@ class ClaudeConfig:
 
     def detect(self):
         states = [link_state(link, target) for target, link in self._links()]
-        if all(s == "ok" for s in states):
-            return "ok", "linked"
-        if any(s != "missing" for s in states):
-            return "partial", "copied, not symlinked" if "copy" in states else "incomplete"
-        return "missing", "not set up"
+        state = combine(states)
+        detail = {"ok": "linked", "partial": "copied, not symlinked" if "copy" in states else "incomplete",
+                  "missing": "not set up"}[state]
+        return state, detail
 
     def install(self):
         settings_link = HOME / ".claude/settings.json"
@@ -462,10 +472,9 @@ class ClaudeConfig:
             ensure_symlink(target, link)
 
 
-COMPONENTS = [c for c in (
-    GitIdentity(), Packages(), ShellConfig(), EditorConfig(),
-    NeovimPlugins(), WindowsTerminal(), ClaudeConfig(),
-) if PLATFORM in c.platforms]
+COMPONENTS = [
+    GitIdentity(), Packages(), VimNvim(), TerminalSetup(), ClaudeConfig(),
+]
 
 
 # --------------------------------------------------------------------------- #

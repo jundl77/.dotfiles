@@ -19,15 +19,15 @@ installed into your system Python.
 
 ## What it manages
 
+The same five components on every OS — each just does the platform-appropriate thing:
+
 | Component | What it does |
 |---|---|
-| git identity + aliases | user.name/email, `co`/`br`/`ci`/`st`/`sm` aliases |
-| packages | winget (Windows: nvim, ripgrep, node) / brew (macOS) / apt (Linux) |
-| shell config | Windows: PowerShell profile (Agnoster-style prompt + unix aliases) + execution policy. macOS/Linux: fish config + bashrc hook |
-| vim/nvim config | symlinks `vimrc` (as `init.vim` for nvim) and `ideavimrc` |
-| nvim plugins + LSP servers | vim-plug, `:PlugInstall`, prunes removed plugins, Mason installs pyright + lua-language-server (nvim 0.11+) |
-| Windows Terminal | Meslo Nerd Font, Material Design color scheme, CSI-u keybinds so Ctrl+Shift+F/N reach nvim |
-| claude config | symlinks `claude/settings.json` and `claude/CLAUDE.md` into `~/.claude` (machine-specific `statusLine` is moved to `settings.local.json`, which stays local) |
+| git | user.name/email, `co`/`br`/`ci`/`st`/`sm` aliases |
+| system packages | winget (Windows: nvim, ripgrep, node) / brew (macOS) / apt (Linux) |
+| vim/nvim | symlinks `vimrc` (as `init.vim` for nvim) + `ideavimrc`, vim-plug, `:PlugInstall`, prunes removed plugins, Mason installs pyright + lua-language-server (nvim 0.11+) |
+| terminal setup | Windows: PowerShell profile (Agnoster-style prompt + unix aliases), execution policy, Meslo Nerd Font, Material Design color scheme, CSI-u keybinds so Ctrl+Shift+F/N reach nvim. macOS/Linux: fish config + bashrc hook |
+| claude | symlinks `claude/settings.json` and `claude/CLAUDE.md` into `~/.claude` (machine-specific `statusLine` is moved to `settings.local.json`, which stays local) |
 
 Configs are **symlinked** into place so a `git pull` updates the live setup.
 On Windows without symlink privilege it falls back to copying and tells you
