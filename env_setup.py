@@ -180,14 +180,6 @@ def wt_settings_path():
 # --------------------------------------------------------------------------- #
 
 class Component:
-    def detect(self):
-        items = self.items()
-        state = combine([s for _, s in items])
-        if state == "ok":
-            return state, self.ok_detail(items)
-        bad = [label for label, s in items if s != "ok"]
-        return state, ", ".join(bad[:3]) + (" ..." if len(bad) > 3 else "")
-
     def ok_detail(self, items):
         return "configured"
 
@@ -499,29 +491,30 @@ def gather_status():
     out = []
     for c in COMPONENTS:
         try:
-            state, detail = c.detect()
-        except Exception as e:  # a broken detect must not kill the menu
-            state, detail = "missing", f"detect failed: {e}"
-        out.append((c, state, detail))
+            items = c.items()
+            state = combine([s for _, s in items])
+            if state == "ok":
+                detail = c.ok_detail(items)
+            else:
+                bad = [label for label, s in items if s != "ok"]
+                detail = ", ".join(bad[:3]) + (" ..." if len(bad) > 3 else "")
+        except Exception as e:  # a broken check must not kill the menu
+            items, state, detail = [], "missing", f"check failed: {e}"
+        out.append((c, state, detail, items))
     return out
 
 
-def print_status(status):
+def print_status(status, expanded=()):
     table = Table(title=f"dotfiles on {PLATFORM}", title_justify="left")
     table.add_column("")
     table.add_column("component")
     table.add_column("detail", style="dim")
-    for c, state, detail in status:
-        table.add_row(MARKS[state], c.name, detail)
-    console.print(table)
-
-
-def print_items(component):
-    table = Table(title=component.name, title_justify="left")
-    table.add_column("")
-    table.add_column("item")
-    for label, state in component.items():
-        table.add_row(MARKS[state], label)
+    for c, state, detail, items in status:
+        arrow = "v" if c.name in expanded else ">"
+        table.add_row(MARKS[state], f"{arrow} {c.name}", detail)
+        if c.name in expanded:
+            for label, istate in items:
+                table.add_row(MARKS[istate], f"    {label}", "")
     console.print(table)
 
 
@@ -536,18 +529,6 @@ def install_component(component):
         return False
 
 
-def dive(component):
-    while True:
-        console.clear()
-        print_items(component)
-        action = questionary.select("What do you want to do?",
-                                    choices=["Install this component", "Back"]).ask()
-        if action != "Install this component":
-            return
-        install_component(component)
-        questionary.press_any_key_to_continue().ask()
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--status", action="store_true", help="print status and exit")
@@ -555,17 +536,15 @@ def main():
     args = parser.parse_args()
 
     if args.status:
-        for c in COMPONENTS:
-            print_items(c)
-        print_status(gather_status())
+        print_status(gather_status(), expanded=[c.name for c in COMPONENTS])
         return
 
     if args.install:
         status = gather_status()
         if args.install == "all":
-            targets = [c for c, state, _ in status if state != "ok"]
+            targets = [c for c, state, _, _ in status if state != "ok"]
         else:
-            targets = [c for c, _, _ in status if args.install.lower() in c.name.lower()]
+            targets = [c for c, _, _, _ in status if args.install.lower() in c.name.lower()]
             if not targets:
                 sys.exit(f"No component matches '{args.install}'. "
                          f"Components: {', '.join(c.name for c in COMPONENTS)}")
@@ -573,33 +552,44 @@ def main():
         print_status(gather_status())
         sys.exit(0 if ok else 1)
 
+    expanded = set()
+    status = gather_status()
     while True:
         console.clear()
         console.print("[bold]env_setup[/] - deploy the dev setup\n")
-        status = gather_status()
-        print_status(status)
-        missing = [c for c, state, _ in status if state != "ok"]
+        print_status(status, expanded)
+        missing = [c for c, state, _, _ in status if state != "ok"]
 
         choices = []
         if missing:
             choices.append(questionary.Choice(f"Install everything missing ({len(missing)})", value="all"))
-        for c, state, _ in status:
-            label = {"ok": "", "partial": "  (partial)", "missing": "  (missing)"}[state]
-            choices.append(questionary.Choice(f"{c.name}{label} ...", value=c))
+        for c, state, _, _ in status:
+            arrow = "v" if c.name in expanded else ">"
+            choices.append(questionary.Choice(f"{arrow} {c.name}", value=("toggle", c)))
+            if c.name in expanded and state != "ok":
+                choices.append(questionary.Choice(f"     install {c.name}", value=("install", c)))
         choices.append(questionary.Choice("Refresh", value="refresh"))
         choices.append(questionary.Choice("Quit", value="quit"))
-        answer = questionary.select("Select a component to inspect, or an action:", choices=choices).ask()
+        answer = questionary.select("Select a component to expand/collapse it:", choices=choices).ask()
 
         if answer is None or answer == "quit":
             return
         if answer == "refresh":
+            status = gather_status()
             continue
         if answer == "all":
             for c in missing:
                 install_component(c)
             questionary.press_any_key_to_continue().ask()
+            status = gather_status()
+            continue
+        action, component = answer
+        if action == "toggle":
+            expanded ^= {component.name}
         else:
-            dive(answer)
+            install_component(component)
+            questionary.press_any_key_to_continue().ask()
+            status = gather_status()
 
 
 if __name__ == "__main__":
