@@ -18,7 +18,6 @@ endif
 Plug 'scrooloose/nerdcommenter'
 Plug 'nvie/vim-flake8'
 Plug 'tpope/vim-repeat'
-Plug 'mg979/vim-visual-multi'               " replaces terryma/vim-multiple-cursors (unmaintained)
 Plug 'kana/vim-submode'
 Plug 'rhysd/vim-grammarous'
 Plug 'reedes/vim-wordy'
