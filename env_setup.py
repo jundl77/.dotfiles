@@ -542,7 +542,7 @@ def main():
     if args.install:
         status = gather_status()
         if args.install == "all":
-            targets = [c for c, state, _, _ in status if state != "ok"]
+            targets = [c for c, _, _, _ in status]
         else:
             targets = [c for c, _, _, _ in status if args.install.lower() in c.name.lower()]
             if not targets:
@@ -563,12 +563,9 @@ def main():
     while True:
         console.clear()
         console.print(f"[bold]env_setup[/] - dotfiles on {PLATFORM}\n")
-        missing = [c for c, state, _, _ in status if state != "ok"]
         width = max(len(c.name) for c, _, _, _ in status) + 2
 
-        choices = []
-        if missing:
-            choices.append(questionary.Choice(f"Install everything missing ({len(missing)})", value="all"))
+        choices = [questionary.Choice("Install all", value="reinstall-all")]
         for c, state, detail, items in status:
             arrow = "v" if c.name in expanded else ">"
             style, mark = styled_marks[state]
@@ -580,7 +577,6 @@ def main():
                 verb = "re-install" if state == "ok" else "install"
                 choices.append(questionary.Choice(f"         {verb} {c.name}", value=("install", c)))
         choices.append(questionary.Choice("Refresh", value="refresh"))
-        choices.append(questionary.Choice("Re-install everything", value="reinstall-all"))
         choices.append(questionary.Choice("Quit", value="quit"))
         answer = questionary.select("Enter expands a component / runs an action:", choices=choices).ask()
 
@@ -592,12 +588,7 @@ def main():
         if isinstance(answer, tuple) and answer[0] == "toggle":
             expanded ^= {answer[1].name}
             continue
-        if answer == "all":
-            targets = missing
-        elif answer == "reinstall-all":
-            targets = [c for c, _, _, _ in status]
-        else:
-            targets = [answer[1]]
+        targets = [c for c, _, _, _ in status] if answer == "reinstall-all" else [answer[1]]
         for c in targets:
             install_component(c)
         questionary.press_any_key_to_continue().ask()
