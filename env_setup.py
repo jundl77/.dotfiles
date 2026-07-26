@@ -528,7 +528,11 @@ class ClaudeConfig(Component):
         if settings_link.exists() and not settings_link.is_symlink():
             existing = json.loads(settings_link.read_text(encoding="utf-8"))
             repo_settings = json.loads((REPO / "claude/settings.json").read_text(encoding="utf-8"))
-            extras = {k: v for k, v in existing.items() if repo_settings.get(k) != v}
+            # statusLine is deliberately excluded: the repo owns it now, and a
+            # machine-local copy (claude-statusbar writes an absolute cs.EXE path)
+            # would shadow the portable one for good, since local wins the merge.
+            extras = {k: v for k, v in existing.items()
+                      if repo_settings.get(k) != v and k != "statusLine"}
             if extras:
                 local_path = HOME / ".claude/settings.local.json"
                 local = json.loads(local_path.read_text(encoding="utf-8")) if local_path.exists() else {}
