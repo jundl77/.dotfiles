@@ -267,7 +267,18 @@ if hop then hop.setup() end
 local autopairs = try('nvim-autopairs')
 if autopairs then autopairs.setup{} end
 local tree = try('nvim-tree')
-if tree then tree.setup{} end
+if tree then
+  tree.setup{}
+  -- CLion-style: sidebar visible from the start, focus stays in the file.
+  -- Skipped when headless (no UI) so the installers' bootstrap runs don't break.
+  vim.api.nvim_create_autocmd('VimEnter', {
+    callback = function()
+      if #vim.api.nvim_list_uis() == 0 then return end
+      require('nvim-tree.api').tree.open()
+      vim.cmd.wincmd('p')
+    end,
+  })
+end
 local lualine = try('lualine')
 if lualine then lualine.setup{ options = { theme = 'auto' } } end
 local telescope = try('telescope')
