@@ -46,6 +46,10 @@ install_windows_terminal_theme() {
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "${DOTFILES_DIR}/windows/install-terminal-theme.ps1")"
 }
 
+install_windows_neovim() {
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "${DOTFILES_DIR}/windows/install-neovim.ps1")"
+}
+
 case "$OS" in
     macos|linux)
         add_item "Git identity + aliases" install_git_identity
@@ -55,6 +59,7 @@ case "$OS" in
         add_item "Git identity + aliases" install_git_identity
         add_item "PowerShell profile (Agnoster-style prompt + unix aliases)" install_windows_profile
         add_item "Windows Terminal font + Material Design color scheme" install_windows_terminal_theme
+        add_item "Neovim + vim config" install_windows_neovim
         ;;
 esac
 
