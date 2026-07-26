@@ -1,11 +1,9 @@
-if test -z "$Z_DATA"
-  if test -z "$XDG_DATA_HOME"
-    set -U Z_DATA_DIR "$HOME/.local/share/z"
-  else 
-    set -U Z_DATA_DIR "$XDG_DATA_HOME/z"
-  end
-  set -U Z_DATA "$Z_DATA_DIR/data"
+if test -z "$XDG_DATA_HOME"
+  set -g Z_DATA_DIR "$HOME/.local/share/z"
+else
+  set -g Z_DATA_DIR "$XDG_DATA_HOME/z"
 end
+set -g Z_DATA "$Z_DATA_DIR/data"
 
 if test ! -e "$Z_DATA"
   if test ! -e "$Z_DATA_DIR"
@@ -33,7 +31,7 @@ if test ! -z $ZO_CMD
 end
 
 if not set -q Z_EXCLUDE
-  set -U Z_EXCLUDE $HOME
+  set -g Z_EXCLUDE $HOME
 end
 
 # Setup completions once first
