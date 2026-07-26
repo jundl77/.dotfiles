@@ -15,13 +15,12 @@ else
 endif
 
 " Plugins for neovim and vim
-Plug 'scrooloose/nerdcommenter'
-Plug 'nvie/vim-flake8'
+Plug 'preservim/nerdcommenter'
 Plug 'tpope/vim-repeat'
 Plug 'mg979/vim-visual-multi'               " replaces terryma/vim-multiple-cursors (unmaintained)
 Plug 'kana/vim-submode'
 Plug 'rhysd/vim-grammarous'
-Plug 'reedes/vim-wordy'
+Plug 'preservim/vim-wordy'
 
 " Install vim or neovim specific plugins (the Lua plugins cannot load in plain vim)
 if has('nvim')
@@ -35,10 +34,9 @@ if has('nvim')
   Plug 'neovim/nvim-lspconfig'                " CLion-style go-to-def/rename/find-usages
   Plug 'williamboman/mason.nvim'              " auto-installs language servers
   Plug 'williamboman/mason-lspconfig.nvim'
-  Plug 'neomake/neomake'
 else
-  Plug 'scrooloose/syntastic'
-  Plug 'Valloric/YouCompleteMe'
+  Plug 'preservim/syntastic'
+  Plug 'ycm-core/YouCompleteMe'
 endif
 
 call plug#end()
@@ -130,10 +128,8 @@ if has('nvim')
   nnoremap <leader>fd <cmd>lua GrepInPath()<CR>
 endif
 
-" Config syntastic
-if has('nvim')
-  call neomake#configure#automake('nrwi', 500)
-else
+" Config syntastic (plain vim only; nvim gets diagnostics from the LSP servers)
+if !has('nvim')
   let g:syntastic_always_populate_loc_list = 1
   let g:syntastic_auto_loc_list = 1
   let g:syntastic_check_on_open = 1
