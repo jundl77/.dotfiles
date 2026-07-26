@@ -1,69 +1,60 @@
 # My dotfile configs
 
-## What's inside?
+One Python installer (`env_setup.py`) deploys the full dev setup on any
+platform: packages, shell + editor + terminal config, and Claude Code config.
 
-- vimrc
-- fish config
-- a few handy binaries, installed via brew (macOS) or apt (Linux)
-- `windows/` - PowerShell profile + Windows Terminal setup, ported from the fish config
+## Usage
 
-## Usage:
+```
+git clone https://github.com/jundl77/.dotfiles ~/.dotfiles
+cd ~/.dotfiles
+python env_setup.py          # interactive menu: see what's installed, install what's not
+python env_setup.py --status         # non-interactive status table
+python env_setup.py --install all    # install everything missing, no menu
+```
 
-Run `./install.sh` — it detects your OS (macOS, Linux, or Windows via Git Bash/WSL)
-and installs everything relevant to it automatically, no prompts.
+The first run creates `.venv/` next to the script and installs the two UI
+libraries (`rich`, `questionary`) there, then re-executes itself — nothing is
+installed into your system Python.
 
-On Windows, symlinking the PowerShell profile requires Developer Mode (Settings ->
-Privacy & Security -> For developers) or an elevated shell; enabling Developer Mode
-only takes effect for new shell sessions (sign out/in or reboot first).
+## What it manages
 
-### macOS / Linux
+| Component | What it does |
+|---|---|
+| git identity + aliases | user.name/email, `co`/`br`/`ci`/`st`/`sm` aliases |
+| packages | winget (Windows: nvim, ripgrep, node) / brew (macOS) / apt (Linux) |
+| shell config | Windows: PowerShell profile (Agnoster-style prompt + unix aliases) + execution policy. macOS/Linux: fish config + bashrc hook |
+| vim/nvim config | symlinks `vimrc` (as `init.vim` for nvim) and `ideavimrc` |
+| nvim plugins + LSP servers | vim-plug, `:PlugInstall`, prunes removed plugins, Mason installs pyright + lua-language-server (nvim 0.11+) |
+| Windows Terminal | Meslo Nerd Font, Material Design color scheme, CSI-u keybinds so Ctrl+Shift+F/N reach nvim |
+| claude config | symlinks `claude/settings.json` and `claude/CLAUDE.md` into `~/.claude` (machine-specific `statusLine` is moved to `settings.local.json`, which stays local) |
 
-Falls through to the existing dotbot-based `./install`, which symlinks the dotfiles and
-installs `eza`/`lnav`/`bat`/`ripgrep`/`highlight`/`vim`/`neovim`/`grc`/`node` via brew on
-macOS or apt on Linux (no brew needed on Linux; `node` is required by Mason to install
-`pyright` — see below), plus:
+Configs are **symlinked** into place so a `git pull` updates the live setup.
+On Windows without symlink privilege it falls back to copying and tells you
+(enable Developer Mode + sign out/in, then re-run to upgrade copies to links).
+Pre-existing real files are backed up once as `<name>.backup`.
 
-- open vim/nvim and run ```:PlugInstall```
-- YouCompleteMe needs a one-time native build: `~/.vim/plugged/YouCompleteMe/install.py --clangd-completer`
-- The LSP features need nvim 0.11+; apt on Ubuntu/Debian ships an older neovim, on which the
-  vimrc silently skips the LSP section (everything else still works). Install a current nvim
-  (snap/appimage/PPA) to get them on Linux.
+## vimrc
 
-### Windows
+CLion-flavored nvim setup: Telescope for Go to File / Find in Path
+(`Ctrl+Shift+N`/`Ctrl+Shift+F`, laid out like CLion's dialog — prompt on top,
+matches, preview editor below; `,fd` greps an arbitrary directory; `Ctrl+P`,
+`,ff`, `,fg` as universal fallbacks), `nvim-tree.lua` file-explorer sidebar
+(`Ctrl+H`), and `nvim-lspconfig` + `mason.nvim` for Go to Declaration /
+Implementation (`Ctrl+B`/`Ctrl+Alt+B`), Find Usages (`Alt+F7`), Rename
+(`Shift+F6`), Quick Documentation (`Ctrl+Q`), Intentions (`Alt+Enter`),
+Reformat (`Ctrl+Alt+L`), and next/prev error (`F2`/`Shift+F2`). Multi-cursor
+is opt-in via `;m` (then `n` next / `q` skip / `Esc` exit).
 
-- `windows/Microsoft.PowerShell_profile.ps1` - Agnoster-style prompt (status/venv/path/git
-  segments with powerline separators, ported from `config/fish/functions/fish_prompt.fish`)
-  plus unix-like aliases (`ll`, `la`, `grep`, `which`, `touch`, `open`, `df`, `..`/`.../....`)
-- `windows/material-design.windowsterminal.json` - Windows Terminal color scheme, ported
-  from `iterm-themes/material-design.itermcolors`
-- `windows/install-terminal-theme.ps1` - installs the Meslo Nerd Font (glyphs for the
-  prompt) and registers the color scheme as the default for all Windows Terminal profiles
-- `windows/link-profile.ps1` - symlinks the profile into place and sets the CurrentUser
-  script execution policy to RemoteSigned (both required for the profile to load)
-- `windows/install-neovim.ps1` - installs Neovim, ripgrep, and Node.js via winget, symlinks
-  `vimrc` as `init.vim`, and runs `:PlugInstall` + Mason's language-server install headlessly
+The LSP features need nvim 0.11+; on older neovim (e.g. apt's) the vimrc
+silently skips the LSP section and everything else still works. Plain vim is
+still supported: nvim-only plugins and mappings are guarded, and vim gets
+syntastic/YouCompleteMe instead.
 
-### vimrc (all platforms)
+## Notes
 
-CLion-flavored: Telescope for Go to File / Find in Path (`Ctrl+Shift+N`/`Ctrl+Shift+F`,
-laid out like CLion's dialog — prompt on top, matches, preview editor below; `,fd` greps
-an arbitrary directory instead of the cwd; many terminals can't transmit Ctrl+Shift
-chords and Windows Terminal grabs `Ctrl+Shift+F` for its own find, so `Ctrl+P`, `,ff`
-and `,fg` work everywhere as fallbacks),
-`nvim-tree.lua` as a file-explorer sidebar (`Ctrl+H`), and `nvim-lspconfig` + `mason.nvim`
-(auto-installs `pyright` + `lua_ls`) for Go to Declaration/Implementation (`Ctrl+B`/
-`Ctrl+Alt+B`), Find Usages (`Alt+F7`), Rename (`Shift+F6`), Quick Documentation (`Ctrl+Q`),
-Show Intention Actions (`Alt+Enter`), Reformat Code (`Ctrl+Alt+L`), and next/previous
-highlighted error (`F2`/`Shift+F2`). `Ctrl+D` (duplicate line) and `Ctrl+/` (comment) were
-deliberately left off since they collide with vim's native scroll and this repo's existing
-`Ctrl+C` comment-toggle binding.
-
-## Dependencies:
-
-- fish (macOS/Linux)
-- brew (macOS)
-- apt-based distro, e.g. Ubuntu/Debian/WSL (Linux)
-- Windows Terminal (Windows)
-- ripgrep + Node.js (Telescope live_grep and Mason's pyright install, respectively —
-  installed automatically by `./install`/`./install.sh` on every platform)
-
+- `Ctrl+D` (CLion duplicate line) and `Ctrl+/` (CLion comment) are deliberately
+  unmapped — they collide with vim's native scroll and the existing `Ctrl+C`
+  comment binding.
+- On macOS, install [Homebrew](https://brew.sh) first; on Windows, `winget`
+  (ships with Windows 11) and Python 3 are the only prerequisites.
