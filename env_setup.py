@@ -565,7 +565,7 @@ def main():
         console.print(f"[bold]env_setup[/] - dotfiles on {PLATFORM}\n")
         width = max(len(c.name) for c, _, _, _ in status) + 2
 
-        choices = [questionary.Choice("Install all", value="reinstall-all")]
+        choices = []
         for c, state, detail, items in status:
             arrow = "v" if c.name in expanded else ">"
             style, mark = styled_marks[state]
@@ -576,6 +576,7 @@ def main():
                     choices.append(questionary.Separator(f"      {text_marks[istate]}  {label}"))
                 verb = "re-install" if state == "ok" else "install"
                 choices.append(questionary.Choice(f"         {verb} {c.name}", value=("install", c)))
+        choices.append(questionary.Choice("Install all", value="reinstall-all"))
         choices.append(questionary.Choice("Refresh", value="refresh"))
         choices.append(questionary.Choice("Quit", value="quit"))
         answer = questionary.select("Enter expands a component / runs an action:", choices=choices).ask()
