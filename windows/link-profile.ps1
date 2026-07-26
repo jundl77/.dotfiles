@@ -28,6 +28,9 @@ try {
     New-Item -ItemType SymbolicLink -Path $target -Target $source | Out-Null
     Write-Output "Linked $target -> $source"
 } catch {
-    Write-Warning "Could not create symlink (enable Windows Developer Mode, or re-run from an Administrator prompt): $_"
-    exit 1
+    # Developer Mode's symlink privilege only applies to new logon tokens, so this
+    # can fail right after enabling it. Fall back to a plain copy so the profile still
+    # works today; re-running after a fresh sign-in will upgrade it to a real symlink.
+    Copy-Item $source $target -Force
+    Write-Warning "Could not create symlink (enable Windows Developer Mode and sign out/in, or run as Administrator) - copied instead of linking for now."
 }
