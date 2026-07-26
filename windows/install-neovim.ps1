@@ -11,8 +11,9 @@ if (-not (Get-Command rg -ErrorAction SilentlyContinue)) {
     winget install BurntSushi.ripgrep.MSVC --accept-package-agreements --accept-source-agreements
 }
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    # required by Mason to install pyright (lua_ls ships as a standalone binary, no node needed)
-    winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+    # required by Mason to install pyright (lua-language-server ships as a standalone binary).
+    # --scope user avoids the MSI's admin-elevation prompt (picks the portable zip build instead).
+    winget install OpenJS.NodeJS.LTS --scope user --accept-package-agreements --accept-source-agreements
 }
 
 # Winget-installed binaries land on the machine/user PATH, but this process's own
@@ -53,10 +54,22 @@ if (-not (Test-Path $plugPath)) {
     Write-Output "Installed vim-plug."
 }
 
-Write-Output "Running :PlugClean! and :PlugInstall headlessly (some plugins may need manual follow-up on Windows)..."
-nvim --headless "+PlugClean!" "+PlugInstall" "+qa"
+Write-Output "Running :PlugInstall headlessly (some plugins may need manual follow-up on Windows)..."
+nvim --headless "+PlugInstall" "+qa"
 
-Write-Output "Installing language servers via Mason (pyright, lua_ls)..."
-nvim --headless "+MasonInstall pyright lua_ls" "+qa"
+# :PlugClean! doesn't reliably delete in headless mode (it appears to need a UI), so prune
+# directly: remove any plugged/ directory whose repo isn't currently declared in vimrc.
+$declaredPlugins = [regex]::Matches((Get-Content $source -Raw), "Plug\s+'[^/]+/([^']+)'") |
+    ForEach-Object { $_.Groups[1].Value }
+$pluggedDir = Join-Path $configDir "plugged"
+if (Test-Path $pluggedDir) {
+    Get-ChildItem $pluggedDir -Directory | Where-Object { $declaredPlugins -notcontains $_.Name } | ForEach-Object {
+        Write-Output "Removing unused plugin: $($_.Name)"
+        Remove-Item $_.FullName -Recurse -Force
+    }
+}
+
+Write-Output "Installing language servers via Mason (pyright, lua-language-server)..."
+nvim --headless "+MasonInstall pyright lua-language-server" "+qa"
 
 Write-Output "Neovim setup complete."

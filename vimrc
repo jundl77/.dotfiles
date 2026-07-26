@@ -12,7 +12,7 @@ endif
 
 " Plugins for neovim and vim
 Plug 'scrooloose/nerdcommenter'
-Plug 'phaazon/hop.nvim'                     " replaces easymotion/vim-easymotion (unmaintained)
+Plug 'smoka7/hop.nvim'                      " replaces easymotion/vim-easymotion (unmaintained)
 Plug 'nvie/vim-flake8'
 Plug 'nvim-lualine/lualine.nvim'            " replaces bling/vim-airline (unmaintained)
 Plug 'nvim-tree/nvim-web-devicons'
@@ -263,11 +263,14 @@ local on_attach = function(client, bufnr)
   vim.keymap.set('n', '<C-A-l>', function() vim.lsp.buf.format{ async = true } end, opts) -- Reformat Code
   vim.keymap.set('n', '<F2>', vim.diagnostic.goto_next, opts)        -- Next Highlighted Error
   vim.keymap.set('n', '<S-F2>', vim.diagnostic.goto_prev, opts)      -- Previous Highlighted Error
-  if client.supports_method('textDocument/completion') then
+  if client:supports_method('textDocument/completion') then
     vim.lsp.completion.enable(true, client.id, bufnr, { autotrigger = true })
   end
 end
 
-require('lspconfig').pyright.setup{ on_attach = on_attach }
-require('lspconfig').lua_ls.setup{ on_attach = on_attach }
+-- nvim-lspconfig still ships the default per-server configs vim.lsp.config() merges with;
+-- vim.lsp.config/enable is the native nvim 0.11+ API replacing require('lspconfig').X.setup{}
+vim.lsp.config('pyright', { on_attach = on_attach })
+vim.lsp.config('lua_ls', { on_attach = on_attach })
+vim.lsp.enable({ 'pyright', 'lua_ls' })
 EOF
