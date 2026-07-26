@@ -6,10 +6,15 @@ $ErrorActionPreference = "Stop"
 
 # oh-my-posh isn't used for the prompt itself (see Microsoft.PowerShell_profile.ps1),
 # but its font installer is the simplest way to fetch and register a patched Nerd Font.
-if (-not (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
-    winget install JanDeDobbeleer.OhMyPosh -s winget --accept-package-agreements --accept-source-agreements
+# Skip when the font is already installed: the font installer's TUI never exits in a
+# non-interactive shell, which hangs unattended re-runs.
+$fontInstalled = Test-Path "$env:LOCALAPPDATA\Microsoft\Windows\Fonts\MesloLGMNerdFontMono-Regular.ttf"
+if (-not $fontInstalled) {
+    if (-not (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
+        winget install JanDeDobbeleer.OhMyPosh -s winget --accept-package-agreements --accept-source-agreements
+    }
+    oh-my-posh font install meslo
 }
-oh-my-posh font install meslo
 
 $settingsPath = Get-ChildItem "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_*\LocalState\settings.json" -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty FullName
