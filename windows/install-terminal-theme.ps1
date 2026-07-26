@@ -35,15 +35,31 @@ if (-not $settings.profiles.defaults) {
 $settings.profiles.defaults | Add-Member -MemberType NoteProperty -Name colorScheme -Value "Material Design" -Force
 $settings.profiles.defaults | Add-Member -MemberType NoteProperty -Name font -Value ([PSCustomObject]@{ face = "MesloLGM Nerd Font Mono" }) -Force
 
-# Free Ctrl+Shift+F / Ctrl+Shift+N so they reach nvim (the vimrc's CLion-style
-# Telescope binds); Windows Terminal otherwise swallows them for its own
-# find / new-window actions. id = $null is WT's canonical "unbound" form.
+# Route Ctrl+Shift+F / Ctrl+Shift+N to nvim (the vimrc's CLion-style Telescope
+# binds). Windows Terminal otherwise swallows them for its own find/new-window
+# actions - and even unbound, it cannot transmit Ctrl+Shift distinctly from
+# plain Ctrl. sendInput with the CSI-u extended-key encoding (ESC[<codepoint>;6u,
+# 6 = shift+ctrl) fixes both: nvim parses CSI-u natively. Side effect: pressing
+# these chords at a plain shell prompt inserts a few stray characters.
 if (-not $settings.PSObject.Properties['keybindings']) {
     $settings | Add-Member -MemberType NoteProperty -Name keybindings -Value @() -Force
 }
-foreach ($chord in @("ctrl+shift+f", "ctrl+shift+n")) {
-    $settings.keybindings = @(@($settings.keybindings) | Where-Object { $_.keys -ne $chord })
-    $settings.keybindings += [PSCustomObject]@{ id = $null; keys = $chord }
+if (-not $settings.PSObject.Properties['actions']) {
+    $settings | Add-Member -MemberType NoteProperty -Name actions -Value @() -Force
+}
+$esc = [char]27
+$nvimChords = @(
+    @{ id = "User.nvimFindInPath"; keys = "ctrl+shift+f"; input = "$esc[102;6u" },
+    @{ id = "User.nvimGotoFile"; keys = "ctrl+shift+n"; input = "$esc[110;6u" }
+)
+foreach ($chord in $nvimChords) {
+    $settings.actions = @(@($settings.actions) | Where-Object { $_.id -ne $chord.id })
+    $settings.actions += [PSCustomObject]@{
+        command = [PSCustomObject]@{ action = "sendInput"; input = $chord.input }
+        id      = $chord.id
+    }
+    $settings.keybindings = @(@($settings.keybindings) | Where-Object { $_.keys -ne $chord.keys })
+    $settings.keybindings += [PSCustomObject]@{ id = $chord.id; keys = $chord.keys }
 }
 
 $settings | ConvertTo-Json -Depth 10 | Set-Content $settingsPath -Encoding utf8
