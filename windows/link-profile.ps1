@@ -32,5 +32,5 @@ try {
     # can fail right after enabling it. Fall back to a plain copy so the profile still
     # works today; re-running after a fresh sign-in will upgrade it to a real symlink.
     Copy-Item $source $target -Force
-    Write-Warning "Could not create symlink (enable Windows Developer Mode and sign out/in, or run as Administrator) - copied instead of linking for now."
+    Write-Warning "Could not create symlink (enable Windows Developer Mode and sign out/in, or run as Administrator) - copied instead of linking for now. Underlying error: $_"
 }

@@ -25,6 +25,9 @@ macOS or apt on Linux (no brew needed on Linux; `node` is required by Mason to i
 
 - open vim/nvim and run ```:PlugInstall```
 - YouCompleteMe needs a one-time native build: `~/.vim/plugged/YouCompleteMe/install.py --clangd-completer`
+- The LSP features need nvim 0.11+; apt on Ubuntu/Debian ships an older neovim, on which the
+  vimrc silently skips the LSP section (everything else still works). Install a current nvim
+  (snap/appimage/PPA) to get them on Linux.
 
 ### Windows
 
@@ -42,7 +45,9 @@ macOS or apt on Linux (no brew needed on Linux; `node` is required by Mason to i
 
 ### vimrc (all platforms)
 
-CLion-flavored: Telescope for Go to File / Find in Path (`Ctrl+Shift+N`/`Ctrl+Shift+F`),
+CLion-flavored: Telescope for Go to File / Find in Path (`Ctrl+Shift+N`/`Ctrl+Shift+F`;
+many terminals can't transmit Ctrl+Shift chords and Windows Terminal grabs `Ctrl+Shift+F`
+for its own find, so `Ctrl+P`, `,ff` and `,fg` work everywhere as fallbacks),
 `nvim-tree.lua` as a file-explorer sidebar (`Ctrl+H`), and `nvim-lspconfig` + `mason.nvim`
 (auto-installs `pyright` + `lua_ls`) for Go to Declaration/Implementation (`Ctrl+B`/
 `Ctrl+Alt+B`), Find Usages (`Alt+F7`), Rename (`Shift+F6`), Quick Documentation (`Ctrl+Q`),

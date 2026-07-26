@@ -16,11 +16,14 @@ git submodule update --init --recursive "${DOTBOT_DIR}"
 # Install packages
 case "$(uname -s)" in
     Darwin)
-        brew install exa
+        brew install eza  # exa is dead: Homebrew disabled the formula; eza is the maintained fork (julian_bash.sh's ll alias already uses it)
         brew install lnav
         brew install bat
         brew install ripgrep
         brew install highlight
+        brew install grc
+        brew install vim
+        brew install neovim
         brew install node  # required by Mason to install pyright (see vimrc)
         ;;
     Linux)
