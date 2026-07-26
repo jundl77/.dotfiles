@@ -580,6 +580,7 @@ def main():
                 verb = "re-install" if state == "ok" else "install"
                 choices.append(questionary.Choice(f"         {verb} {c.name}", value=("install", c)))
         choices.append(questionary.Choice("Refresh", value="refresh"))
+        choices.append(questionary.Choice("Re-install everything", value="reinstall-all"))
         choices.append(questionary.Choice("Quit", value="quit"))
         answer = questionary.select("Enter expands a component / runs an action:", choices=choices).ask()
 
@@ -591,7 +592,12 @@ def main():
         if isinstance(answer, tuple) and answer[0] == "toggle":
             expanded ^= {answer[1].name}
             continue
-        targets = missing if answer == "all" else [answer[1]]
+        if answer == "all":
+            targets = missing
+        elif answer == "reinstall-all":
+            targets = [c for c, _, _, _ in status]
+        else:
+            targets = [answer[1]]
         for c in targets:
             install_component(c)
         questionary.press_any_key_to_continue().ask()
