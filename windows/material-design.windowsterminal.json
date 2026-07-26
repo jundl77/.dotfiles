@@ -1,0 +1,23 @@
+{
+    "name": "Material Design",
+    "black": "#435B67",
+    "red": "#FC3841",
+    "green": "#5CF19E",
+    "yellow": "#FED032",
+    "blue": "#37B6FF",
+    "purple": "#FC226E",
+    "cyan": "#59FFD1",
+    "white": "#FFFFFF",
+    "brightBlack": "#A1B0B8",
+    "brightRed": "#FC746D",
+    "brightGreen": "#ADF7BE",
+    "brightYellow": "#FEE16C",
+    "brightBlue": "#70CFFF",
+    "brightPurple": "#FC669B",
+    "brightCyan": "#9AFFE6",
+    "brightWhite": "#FFFFFF",
+    "background": "#1D262A",
+    "foreground": "#E7EBED",
+    "cursorColor": "#EAEAEA",
+    "selectionBackground": "#4E6A78"
+}
