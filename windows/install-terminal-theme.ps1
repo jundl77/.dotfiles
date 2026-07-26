@@ -35,5 +35,16 @@ if (-not $settings.profiles.defaults) {
 $settings.profiles.defaults | Add-Member -MemberType NoteProperty -Name colorScheme -Value "Material Design" -Force
 $settings.profiles.defaults | Add-Member -MemberType NoteProperty -Name font -Value ([PSCustomObject]@{ face = "MesloLGM Nerd Font Mono" }) -Force
 
+# Free Ctrl+Shift+F / Ctrl+Shift+N so they reach nvim (the vimrc's CLion-style
+# Telescope binds); Windows Terminal otherwise swallows them for its own
+# find / new-window actions. id = $null is WT's canonical "unbound" form.
+if (-not $settings.PSObject.Properties['keybindings']) {
+    $settings | Add-Member -MemberType NoteProperty -Name keybindings -Value @() -Force
+}
+foreach ($chord in @("ctrl+shift+f", "ctrl+shift+n")) {
+    $settings.keybindings = @(@($settings.keybindings) | Where-Object { $_.keys -ne $chord })
+    $settings.keybindings += [PSCustomObject]@{ id = $null; keys = $chord }
+}
+
 $settings | ConvertTo-Json -Depth 10 | Set-Content $settingsPath -Encoding utf8
 Write-Output "Windows Terminal font + Material Design color scheme installed."
