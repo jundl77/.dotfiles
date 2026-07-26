@@ -2,9 +2,6 @@
 # VERSION: 3.0
 SETUVAR ZO_CMD:zo
 SETUVAR Z_CMD:z
-SETUVAR Z_DATA:/home/julian/\x2elocal/share/z/data
-SETUVAR Z_DATA_DIR:/home/julian/\x2elocal/share/z
-SETUVAR Z_EXCLUDE:/home/julian
 SETUVAR __fish_initialized:3400
 SETUVAR fish_color_autosuggestion:555\x1ebrblack
 SETUVAR fish_color_cancel:\x2dr
