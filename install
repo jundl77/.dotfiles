@@ -14,20 +14,27 @@ git submodule update --init --recursive "${DOTBOT_DIR}"
 "${BASEDIR}/${DOTBOT_DIR}/${DOTBOT_BIN}" -d "${BASEDIR}" -c "${CONFIG}" "${@}"
 
 # Install packages
-if [[ "$(uname)" == "Linux" ]]; then
-    sudo apt-get update
-    sudo apt-get install -y eza lnav bat ripgrep highlight vim neovim grc
+case "$(uname -s)" in
+    Darwin)
+        brew install exa
+        brew install lnav
+        brew install bat
+        brew install ripgrep
+        brew install highlight
+        ;;
+    Linux)
+        sudo apt-get update
+        sudo apt-get install -y eza lnav bat ripgrep highlight vim neovim grc
 
-    # Debian/Ubuntu ship bat's binary as `batcat`; expose it as `bat` too
-    mkdir -p ~/bin
-    ln -sf "$(command -v batcat)" ~/bin/bat
-else
-    brew install exa
-    brew install lnav
-    brew install bat
-    brew install ripgrep
-    brew install highlight
-fi
+        # Debian/Ubuntu ship bat's binary as `batcat`; expose it as `bat` too
+        mkdir -p ~/bin
+        ln -sf "$(command -v batcat)" ~/bin/bat
+        ;;
+    *)
+        echo "./install doesn't support $(uname -s) -- run ./install.sh instead." >&2
+        exit 1
+        ;;
+esac
 
 # Install Vim-Plug
 curl -fLo ~/.vim/autoload/plug.vim --create-dirs \

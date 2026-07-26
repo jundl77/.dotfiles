@@ -10,8 +10,7 @@
 ## Usage:
 
 Run `./install.sh` — it detects your OS (macOS, Linux, or Windows via Git Bash/WSL)
-and shows a menu of only the pieces relevant to it. Pick numbers separated by spaces,
-or `all`.
+and installs everything relevant to it automatically, no prompts.
 
 On Windows, symlinking the PowerShell profile requires Developer Mode (Settings ->
 Privacy & Security -> For developers) or an elevated shell; enabling Developer Mode
