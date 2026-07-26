@@ -24,6 +24,7 @@ Plug 'preservim/vim-wordy'
 
 " Install vim or neovim specific plugins (the Lua plugins cannot load in plain vim)
 if has('nvim')
+  Plug 'catppuccin/nvim', { 'as': 'catppuccin' }
   Plug 'smoka7/hop.nvim'                      " replaces easymotion/vim-easymotion (unmaintained)
   Plug 'nvim-lualine/lualine.nvim'            " replaces bling/vim-airline (unmaintained)
   Plug 'nvim-tree/nvim-web-devicons'
@@ -264,6 +265,11 @@ local function try(mod)
   return ok and m or nil
 end
 
+local catppuccin = try('catppuccin')
+if catppuccin then
+  catppuccin.setup{ flavour = 'mocha' }
+  vim.cmd.colorscheme('catppuccin')
+end
 local hop = try('hop')
 if hop then hop.setup() end
 local autopairs = try('nvim-autopairs')
