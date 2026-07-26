@@ -552,7 +552,12 @@ def main():
         print_status(gather_status())
         sys.exit(0 if ok else 1)
 
-    marks = {"ok": "OK", "partial": " ~", "missing": " X"}
+    styled_marks = {
+        "ok": ("fg:ansigreen bold", "OK"),
+        "partial": ("fg:ansiyellow bold", " ~"),
+        "missing": ("fg:ansired bold", " X"),
+    }
+    text_marks = {"ok": "OK", "partial": " ~", "missing": " X"}
     expanded = set()
     status = gather_status()
     while True:
@@ -566,13 +571,14 @@ def main():
             choices.append(questionary.Choice(f"Install everything missing ({len(missing)})", value="all"))
         for c, state, detail, items in status:
             arrow = "v" if c.name in expanded else ">"
-            choices.append(questionary.Choice(
-                f"{marks[state]} {arrow} {c.name:<{width}} {detail}", value=("toggle", c)))
+            style, mark = styled_marks[state]
+            title = [(style, mark), ("", f" {arrow} {c.name:<{width}}"), ("fg:ansibrightblack", detail)]
+            choices.append(questionary.Choice(title, value=("toggle", c)))
             if c.name in expanded:
                 for label, istate in items:
-                    choices.append(questionary.Separator(f"     {marks[istate]}   {label}"))
+                    choices.append(questionary.Separator(f"      {text_marks[istate]}  {label}"))
                 if state != "ok":
-                    choices.append(questionary.Choice(f"        install {c.name}", value=("install", c)))
+                    choices.append(questionary.Choice(f"         install {c.name}", value=("install", c)))
         choices.append(questionary.Choice("Refresh", value="refresh"))
         choices.append(questionary.Choice("Quit", value="quit"))
         answer = questionary.select("Enter expands a component / runs an action:", choices=choices).ask()
