@@ -577,8 +577,8 @@ def main():
             if c.name in expanded:
                 for label, istate in items:
                     choices.append(questionary.Separator(f"      {text_marks[istate]}  {label}"))
-                if state != "ok":
-                    choices.append(questionary.Choice(f"         install {c.name}", value=("install", c)))
+                verb = "re-install" if state == "ok" else "install"
+                choices.append(questionary.Choice(f"         {verb} {c.name}", value=("install", c)))
         choices.append(questionary.Choice("Refresh", value="refresh"))
         choices.append(questionary.Choice("Quit", value="quit"))
         answer = questionary.select("Enter expands a component / runs an action:", choices=choices).ask()
