@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# OS-aware installer menu. Detects macOS / Linux / Windows (via Git Bash or WSL) and
-# offers only the relevant pieces of this repo, so one entry point works everywhere.
+# OS-aware installer. Detects macOS / Linux / Windows (via Git Bash or WSL) and
+# installs everything relevant to it, so one entry point works everywhere.
 set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,12 +12,8 @@ case "$(uname -s)" in
     *) echo "Unsupported OS: $(uname -s)"; exit 1 ;;
 esac
 
-echo "Detected OS: ${OS}"
+echo "Detected OS: ${OS} -- installing everything for it."
 echo
-
-ITEM_NAMES=()
-ITEM_FUNCS=()
-add_item() { ITEM_NAMES+=("$1"); ITEM_FUNCS+=("$2"); }
 
 install_git_identity() {
     git config --global user.email "julianbrendl@gmail.com"
@@ -48,40 +44,23 @@ install_windows_terminal_theme() {
 
 case "$OS" in
     macos|linux)
-        add_item "Git identity + aliases" install_git_identity
-        add_item "Fish shell + vim config + brew tools (dotbot)" install_macos_linux_dotfiles
+        echo "==> Installing: Git identity + aliases"
+        install_git_identity
+        echo
+        echo "==> Installing: Fish shell + vim config + brew/apt tools (dotbot)"
+        install_macos_linux_dotfiles
         ;;
     windows)
-        add_item "Git identity + aliases" install_git_identity
-        add_item "PowerShell profile (Agnoster-style prompt + unix aliases)" install_windows_profile
-        add_item "Windows Terminal font + Material Design color scheme" install_windows_terminal_theme
+        echo "==> Installing: Git identity + aliases"
+        install_git_identity
+        echo
+        echo "==> Installing: PowerShell profile (Agnoster-style prompt + unix aliases)"
+        install_windows_profile
+        echo
+        echo "==> Installing: Windows Terminal font + Material Design color scheme"
+        install_windows_terminal_theme
         ;;
 esac
-
-echo "What do you want to install?"
-for i in "${!ITEM_NAMES[@]}"; do
-    printf "  %d) %s\n" "$((i + 1))" "${ITEM_NAMES[$i]}"
-done
-echo
-
-read -rp "Enter numbers separated by spaces, or 'all': " SELECTION
-
-if [ "${SELECTION}" = "all" ]; then
-    SELECTION="$(seq 1 "${#ITEM_NAMES[@]}")"
-fi
-
-for n in ${SELECTION}; do
-    idx=$((n - 1))
-    name="${ITEM_NAMES[$idx]:-}"
-    func="${ITEM_FUNCS[$idx]:-}"
-    if [ -z "${func}" ]; then
-        echo "Skipping invalid selection: ${n}"
-        continue
-    fi
-    echo
-    echo "==> Installing: ${name}"
-    "${func}"
-done
 
 echo
 echo "Done."
