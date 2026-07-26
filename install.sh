@@ -49,7 +49,7 @@ install_windows_terminal_theme() {
 case "$OS" in
     macos|linux)
         add_item "Git identity + aliases" install_git_identity
-        add_item "Fish shell + vim config + brew tools (dotbot)" install_macos_linux_dotfiles
+        add_item "Fish shell + vim config + brew/apt tools (dotbot)" install_macos_linux_dotfiles
         ;;
     windows)
         add_item "Git identity + aliases" install_git_identity

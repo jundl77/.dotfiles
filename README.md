@@ -4,7 +4,7 @@
 
 - vimrc
 - fish config
-- a few handy binaries installed via brew
+- a few handy binaries, installed via brew (macOS) or apt (Linux)
 - `windows/` - PowerShell profile + Windows Terminal setup, ported from the fish config
 
 ## Usage:
@@ -19,9 +19,12 @@ only takes effect for new shell sessions (sign out/in or reboot first).
 
 ### macOS / Linux
 
-Falls through to the existing dotbot-based `./install`, plus:
+Falls through to the existing dotbot-based `./install`, which symlinks the dotfiles and
+installs `eza`/`lnav`/`bat`/`ripgrep`/`highlight`/`vim`/`neovim`/`grc` via brew on macOS
+or apt on Linux (no brew needed on Linux), plus:
 
 - open vim/nvim and run ```:PlugInstall```
+- YouCompleteMe needs a one-time native build: `~/.vim/plugged/YouCompleteMe/install.py --clangd-completer`
 
 ### Windows
 
@@ -39,5 +42,6 @@ Falls through to the existing dotbot-based `./install`, plus:
 
 - fish (macOS/Linux)
 - brew (macOS)
+- apt-based distro, e.g. Ubuntu/Debian/WSL (Linux)
 - Windows Terminal (Windows)
 
