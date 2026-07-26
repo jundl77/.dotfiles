@@ -130,6 +130,8 @@ if has('nvim')
   nnoremap <C-p> <cmd>Telescope find_files<CR>
   nnoremap <leader>ff <cmd>Telescope find_files<CR>
   nnoremap <leader>fg <cmd>Telescope live_grep<CR>
+  " grep in an arbitrary directory instead of the cwd (prompts for the path)
+  nnoremap <leader>fd <cmd>lua GrepInPath()<CR>
 endif
 
 " Config syntastic
@@ -283,8 +285,33 @@ if telescope then
   telescope.setup{
     defaults = {
       file_ignore_patterns = { 'node_modules', '%.git/', '%.DS_Store' },
+      -- CLion Find-in-Path shape: prompt on top, matches under it, preview
+      -- editor at the bottom (default telescope puts the preview beside)
+      layout_strategy = 'vertical',
+      sorting_strategy = 'ascending',
+      layout_config = {
+        vertical = {
+          width = 0.85,
+          height = 0.9,
+          preview_height = 0.45,
+          prompt_position = 'top',
+          mirror = true,
+        },
+      },
     },
   }
+  -- CLion's Find in Path can target any directory, not just the cwd:
+  -- prompts for a path (tab-completes), then live-greps inside it.
+  _G.GrepInPath = function()
+    vim.ui.input(
+      { prompt = 'Search in dir: ', default = vim.fn.getcwd(), completion = 'dir' },
+      function(dir)
+        if dir and dir ~= '' then
+          require('telescope.builtin').live_grep({ search_dirs = { dir } })
+        end
+      end
+    )
+  end
 end
 
 -- LSP needs nvim 0.11+: vim.lsp.config/enable and vim.lsp.completion don't

@@ -45,9 +45,11 @@ macOS or apt on Linux (no brew needed on Linux; `node` is required by Mason to i
 
 ### vimrc (all platforms)
 
-CLion-flavored: Telescope for Go to File / Find in Path (`Ctrl+Shift+N`/`Ctrl+Shift+F`;
-many terminals can't transmit Ctrl+Shift chords and Windows Terminal grabs `Ctrl+Shift+F`
-for its own find, so `Ctrl+P`, `,ff` and `,fg` work everywhere as fallbacks),
+CLion-flavored: Telescope for Go to File / Find in Path (`Ctrl+Shift+N`/`Ctrl+Shift+F`,
+laid out like CLion's dialog — prompt on top, matches, preview editor below; `,fd` greps
+an arbitrary directory instead of the cwd; many terminals can't transmit Ctrl+Shift
+chords and Windows Terminal grabs `Ctrl+Shift+F` for its own find, so `Ctrl+P`, `,ff`
+and `,fg` work everywhere as fallbacks),
 `nvim-tree.lua` as a file-explorer sidebar (`Ctrl+H`), and `nvim-lspconfig` + `mason.nvim`
 (auto-installs `pyright` + `lua_ls`) for Go to Declaration/Implementation (`Ctrl+B`/
 `Ctrl+Alt+B`), Find Usages (`Alt+F7`), Rename (`Shift+F6`), Quick Documentation (`Ctrl+Q`),
