@@ -149,7 +149,10 @@ set expandtab
 set shiftwidth=2
 set smartindent
 set autoindent
-set pastetoggle=<f5>
+try
+  set pastetoggle=<f5>
+catch
+endtry
 set hidden
 set mouse=a
 set foldmethod=indent
