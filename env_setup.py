@@ -99,53 +99,53 @@ if PLATFORM == "windows":
     refresh_windows_path()
 
 
+def short(path: Path):
+    return str(path).replace(str(HOME), "~")
+
+
 def link_state(link: Path, target: Path):
-    """'ok' (symlink to target), 'copy' (plain file present), or 'missing'."""
+    """'ok' (symlink to target), 'partial' (plain copy present), or 'missing'."""
     if link.is_symlink():
         try:
             if link.resolve() == target.resolve():
                 return "ok"
         except OSError:
             pass
-        return "copy"
+        return "partial"
     if link.exists():
-        return "copy"
+        return "partial"
     return "missing"
 
 
 def ensure_symlink(target: Path, link: Path):
     """Symlink link -> target; on Windows without the privilege, copy instead."""
-    state = link_state(link, target)
-    if state == "ok":
-        return "ok"
+    if link_state(link, target) == "ok":
+        return
     link.parent.mkdir(parents=True, exist_ok=True)
     if link.exists() or link.is_symlink():
         backup = link.with_name(link.name + ".backup")
         if not link.is_symlink() and not backup.exists():
             shutil.copy2(link, backup)
-            console.print(f"  backed up {link} -> {backup.name}")
+            console.print(f"  backed up {short(link)} -> {backup.name}")
         if link.is_dir() and not link.is_symlink():
             shutil.rmtree(link)
         else:
             link.unlink()
     try:
         link.symlink_to(target, target_is_directory=target.is_dir())
-        console.print(f"  linked {link} -> {target}")
-        return "ok"
+        console.print(f"  linked {short(link)} -> {short(target)}")
     except OSError:
         if target.is_dir():
             shutil.copytree(target, link)
         else:
             shutil.copy2(target, link)
         console.print(
-            f"  [yellow]copied[/] {target.name} -> {link} "
+            f"  [yellow]copied[/] {target.name} -> {short(link)} "
             "(no symlink privilege - enable Developer Mode and sign out/in, then re-run to upgrade)"
         )
-        return "copy"
 
 
 def combine(states):
-    """Roll sub-check states into one component state."""
     if all(s == "ok" for s in states):
         return "ok"
     if all(s == "missing" for s in states):
@@ -175,22 +175,43 @@ def wt_settings_path():
 
 
 # --------------------------------------------------------------------------- #
-# Components. Each: name, platforms, detect() -> (state, detail), install().
-# States: "ok", "partial", "missing".
+# Components. Each declares its sub-checks in items() -> [(label, state)];
+# the component state is the roll-up. States: "ok", "partial", "missing".
 # --------------------------------------------------------------------------- #
 
-class GitIdentity:
+class Component:
+    def detect(self):
+        items = self.items()
+        state = combine([s for _, s in items])
+        if state == "ok":
+            return state, self.ok_detail(items)
+        bad = [label for label, s in items if s != "ok"]
+        return state, ", ".join(bad[:3]) + (" ..." if len(bad) > 3 else "")
+
+    def ok_detail(self, items):
+        return "configured"
+
+
+class GitIdentity(Component):
     name = "git"
 
-    def detect(self):
+    def items(self):
+        def cfg(key):
+            return run(["git", "config", "--global", key], capture=True, check=False).stdout.strip()
         try:
-            email = run(["git", "config", "--global", "user.email"], capture=True, check=False).stdout.strip()
-            alias = run(["git", "config", "--global", "alias.co"], capture=True, check=False).stdout.strip()
+            items = [
+                (f"user.email = {GIT_EMAIL}", "ok" if cfg("user.email") == GIT_EMAIL else "missing"),
+                (f"user.name = {GIT_NAME}", "ok" if cfg("user.name") == GIT_NAME else "missing"),
+            ]
         except OSError:
-            return "missing", "git not installed"
-        if email == GIT_EMAIL and alias == "checkout":
-            return "ok", email
-        return "missing", "not configured"
+            return [("git binary", "missing")]
+        for alias, expansion in GIT_ALIASES.items():
+            items.append((f"alias {alias} = {expansion}",
+                          "ok" if cfg(f"alias.{alias}") == expansion else "missing"))
+        return items
+
+    def ok_detail(self, items):
+        return GIT_EMAIL
 
     def install(self):
         run(["git", "config", "--global", "user.email", GIT_EMAIL])
@@ -199,7 +220,7 @@ class GitIdentity:
             run(["git", "config", "--global", f"alias.{alias}", expansion])
 
 
-class Packages:
+class Packages(Component):
     name = "system packages"
 
     WINDOWS = [  # (binary, winget id, extra args) - node is needed by Mason for pyright
@@ -210,20 +231,20 @@ class Packages:
     MACOS = ["eza", "lnav", "bat", "ripgrep", "highlight", "grc", "vim", "neovim", "node"]
     LINUX = ["eza", "lnav", "bat", "ripgrep", "highlight", "vim", "neovim", "grc", "nodejs", "npm"]
 
-    def detect(self):
+    def items(self):
         if PLATFORM == "windows":
-            missing = [b for b, _, _ in self.WINDOWS if not shutil.which(b)]
-        elif PLATFORM == "macos":
+            return [(f"{binary} (winget {pkg})", "ok" if shutil.which(binary) else "missing")
+                    for binary, pkg, _ in self.WINDOWS]
+        if PLATFORM == "macos":
             if not shutil.which("brew"):
-                return "missing", "Homebrew not installed (https://brew.sh)"
+                return [("Homebrew (https://brew.sh)", "missing")]
             have = run(["brew", "list", "--formula"], capture=True, check=False).stdout.split()
-            missing = [p for p in self.MACOS if p not in have]
-        else:
-            missing = [p for p in self.LINUX
-                       if run(["dpkg", "-s", p], capture=True, check=False).returncode != 0]
-        if not missing:
-            return "ok", "all present"
-        return ("partial" if len(missing) < 3 else "missing"), "missing: " + ", ".join(missing)
+            return [(f"{p} (brew)", "ok" if p in have else "missing") for p in self.MACOS]
+        return [(f"{p} (apt)", "ok" if run(["dpkg", "-s", p], capture=True, check=False).returncode == 0
+                 else "missing") for p in self.LINUX]
+
+    def ok_detail(self, items):
+        return "all present"
 
     def install(self):
         if PLATFORM == "windows":
@@ -251,7 +272,77 @@ class Packages:
                 (bindir / "bat").symlink_to(batcat)
 
 
-class TerminalSetup:
+class VimNvim(Component):
+    """Everything editor: config symlinks, plugins, LSP servers."""
+    name = "vim/nvim"
+
+    PLUGGED = HOME / ".config/nvim/plugged"
+    LSP_SERVERS = ["pyright", "lua-language-server"]
+
+    def _links(self):
+        vimrc = REPO / "vimrc"
+        links = [(REPO / "ideavimrc", HOME / ".ideavimrc")]
+        if PLATFORM == "windows":
+            links.append((vimrc, Path(os.environ["LOCALAPPDATA"]) / "nvim/init.vim"))
+        else:
+            links.append((vimrc, HOME / ".vimrc"))
+            links.append((vimrc, HOME / ".config/nvim/init.vim"))
+        return links
+
+    def _autoload(self):
+        base = Path(os.environ["LOCALAPPDATA"]) / "nvim" if PLATFORM == "windows" else HOME / ".config/nvim"
+        return base / "autoload/plug.vim"
+
+    def _mason_dir(self):
+        return (Path(os.environ["LOCALAPPDATA"]) / "nvim-data" if PLATFORM == "windows"
+                else HOME / ".local/share/nvim") / "mason/packages"
+
+    def _plugin_count(self):
+        return len(list(self.PLUGGED.iterdir())) if self.PLUGGED.is_dir() else 0
+
+    def items(self):
+        items = [("nvim binary", "ok" if shutil.which("nvim") else "missing")]
+        for target, link in self._links():
+            items.append((f"{short(link)} -> {target.name}", link_state(link, target)))
+        items.append(("vim-plug", "ok" if self._autoload().exists() else "missing"))
+        count = self._plugin_count()
+        items.append((f"plugins installed ({count})", "ok" if count else "missing"))
+        version = nvim_version()
+        if version and version >= (0, 11):
+            for server in self.LSP_SERVERS:
+                items.append((f"LSP: {server}", "ok" if (self._mason_dir() / server).exists() else "missing"))
+        return items
+
+    def ok_detail(self, items):
+        return f"{self._plugin_count()} plugins"
+
+    def install(self):
+        if not shutil.which("nvim"):
+            raise RuntimeError("nvim not installed - run the system packages component first")
+        for target, link in self._links():
+            ensure_symlink(target, link)
+        autoload = self._autoload()
+        if not autoload.exists():
+            download("https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim", autoload)
+            console.print("  installed vim-plug")
+        run(["nvim", "--headless", "+PlugInstall", "+qa"])
+        # :PlugClean! is unreliable headlessly; prune undeclared plugins directly
+        declared = re.findall(r"Plug\s+'[^/]+/([^']+)'", (REPO / "vimrc").read_text())
+        if self.PLUGGED.is_dir():
+            for d in self.PLUGGED.iterdir():
+                if d.is_dir() and d.name not in declared:
+                    console.print(f"  removing unused plugin: {d.name}")
+                    shutil.rmtree(d)
+        version = nvim_version()
+        if version and version >= (0, 11):
+            missing = [s for s in self.LSP_SERVERS if not (self._mason_dir() / s).exists()]
+            if missing:
+                run(["nvim", "--headless", "+MasonInstall " + " ".join(missing), "+qa"])
+        else:
+            console.print("  [yellow]nvim < 0.11: skipping LSP servers (vimrc skips LSP there too)[/]")
+
+
+class TerminalSetup(Component):
     """Shell config everywhere; on Windows also the whole terminal look & keybinds."""
     name = "terminal setup"
 
@@ -261,6 +352,7 @@ class TerminalSetup:
         ("User.nvimFindInPath", "ctrl+shift+f", "\x1b[102;6u"),
         ("User.nvimGotoFile", "ctrl+shift+n", "\x1b[110;6u"),
     ]
+    BASHRC_HOOK = "source ~/.dotfiles/julian_bash.sh"
 
     def _links(self):
         if PLATFORM == "windows":
@@ -268,39 +360,33 @@ class TerminalSetup:
                      HOME / "Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1")]
         return [(REPO / "config/fish", HOME / ".config/fish")]
 
-    def _font_ok(self):
-        return (self.FONT_DIR / "MesloLGMNerdFontMono-Regular.ttf").exists()
-
-    def detect(self):
-        states, problems = [], []
+    def items(self):
+        items = []
         for target, link in self._links():
-            s = link_state(link, target)
-            states.append(s)
-            if s != "ok":
-                problems.append("profile copied, not symlinked" if s == "copy" else "profile not linked")
+            items.append((f"{short(link)} -> {target.name}", link_state(link, target)))
         if PLATFORM == "windows":
+            policy = run(["powershell", "-NoProfile", "-Command", "Get-ExecutionPolicy -Scope CurrentUser"],
+                         capture=True, check=False).stdout.strip()
+            items.append(("execution policy (RemoteSigned)",
+                          "ok" if policy not in ("Undefined", "Restricted") else "missing"))
+            items.append(("Meslo Nerd Font",
+                          "ok" if (self.FONT_DIR / "MesloLGMNerdFontMono-Regular.ttf").exists() else "missing"))
             settings_path = wt_settings_path()
             if not settings_path:
-                return "missing", "Windows Terminal not installed"
-            s = json.loads(settings_path.read_text(encoding="utf-8-sig"))
-            for ok, label in [
-                (self._font_ok(), "font"),
-                (any(sc.get("name") == "Material Design" for sc in s.get("schemes", [])), "theme"),
-                (all(any(a.get("id") == cid for a in s.get("actions", []))
-                     for cid, _, _ in self.NVIM_CHORDS), "keybinds"),
-            ]:
-                states.append("ok" if ok else "missing")
-                if not ok:
-                    problems.append(f"{label} missing")
+                items.append(("Windows Terminal", "missing"))
+            else:
+                s = json.loads(settings_path.read_text(encoding="utf-8-sig"))
+                items.append(("Material Design color scheme",
+                              "ok" if any(sc.get("name") == "Material Design" for sc in s.get("schemes", []))
+                              else "missing"))
+                items.append(("Ctrl+Shift+F/N keybinds for nvim",
+                              "ok" if all(any(a.get("id") == cid for a in s.get("actions", []))
+                                          for cid, _, _ in self.NVIM_CHORDS) else "missing"))
         else:
             bashrc = HOME / ".bashrc"
-            hook = "source ~/.dotfiles/julian_bash.sh"
-            hooked = bashrc.exists() and hook in bashrc.read_text()
-            states.append("ok" if hooked else "missing")
-            if not hooked:
-                problems.append("bashrc hook missing")
-        state = combine(states)
-        return state, "configured" if state == "ok" else ", ".join(problems)
+            hooked = bashrc.exists() and self.BASHRC_HOOK in bashrc.read_text()
+            items.append(("bashrc hook (julian_bash.sh)", "ok" if hooked else "missing"))
+        return items
 
     def install(self):
         for target, link in self._links():
@@ -316,13 +402,12 @@ class TerminalSetup:
             self._install_terminal_settings()
         else:
             bashrc = HOME / ".bashrc"
-            hook = "source ~/.dotfiles/julian_bash.sh"
-            if not bashrc.exists() or hook not in bashrc.read_text():
+            if not bashrc.exists() or self.BASHRC_HOOK not in bashrc.read_text():
                 with bashrc.open("a") as f:
-                    f.write(f"\n{hook}\n")
+                    f.write(f"\n{self.BASHRC_HOOK}\n")
 
     def _install_font(self):
-        if self._font_ok():
+        if (self.FONT_DIR / "MesloLGMNerdFontMono-Regular.ttf").exists():
             return
         console.print("  downloading Meslo Nerd Font (~30 MB) ...")
         import winreg
@@ -344,6 +429,9 @@ class TerminalSetup:
 
     def _install_terminal_settings(self):
         settings_path = wt_settings_path()
+        if not settings_path:
+            console.print("  [yellow]Windows Terminal not installed - skipping theme/keybinds[/]")
+            return
         s = json.loads(settings_path.read_text(encoding="utf-8-sig"))
         scheme = json.loads((REPO / "windows/material-design.windowsterminal.json").read_text())
         s.setdefault("schemes", [])
@@ -362,84 +450,7 @@ class TerminalSetup:
         console.print("  Windows Terminal settings updated")
 
 
-class VimNvim:
-    """Everything editor: config symlinks, plugins, LSP servers."""
-    name = "vim/nvim"
-
-    PLUGGED = HOME / ".config/nvim/plugged"
-    LSP_SERVERS = ["pyright", "lua-language-server"]
-
-    def _links(self):
-        vimrc = REPO / "vimrc"
-        links = [(REPO / "ideavimrc", HOME / ".ideavimrc")]
-        if PLATFORM == "windows":
-            links.append((vimrc, Path(os.environ["LOCALAPPDATA"]) / "nvim/init.vim"))
-        else:
-            links.append((vimrc, HOME / ".vimrc"))
-            links.append((vimrc, HOME / ".config/nvim/init.vim"))
-        return links
-
-    def _autoload(self):
-        base = Path(os.environ["LOCALAPPDATA"]) / "nvim" if PLATFORM == "windows" else HOME / ".config/nvim"
-        return base / "autoload/plug.vim"
-
-    def _mason_missing(self):
-        mason = (Path(os.environ["LOCALAPPDATA"]) / "nvim-data" if PLATFORM == "windows"
-                 else HOME / ".local/share/nvim") / "mason/packages"
-        return [s for s in self.LSP_SERVERS if not (mason / s).exists()]
-
-    def detect(self):
-        states, problems = [], []
-        if not shutil.which("nvim"):
-            return "missing", "nvim not installed (run system packages first)"
-        for target, link in self._links():
-            s = link_state(link, target)
-            states.append(s)
-            if s != "ok":
-                problems.append(f"{link.name} " + ("copied, not symlinked" if s == "copy" else "not linked"))
-        plug_ok = self._autoload().exists()
-        plugins_ok = self.PLUGGED.is_dir() and any(self.PLUGGED.iterdir())
-        states += ["ok" if plug_ok else "missing", "ok" if plugins_ok else "missing"]
-        if not plug_ok:
-            problems.append("vim-plug missing")
-        elif not plugins_ok:
-            problems.append("plugins not installed")
-        version = nvim_version()
-        if version and version >= (0, 11):
-            mason_missing = self._mason_missing()
-            states.append("ok" if not mason_missing else "missing")
-            if mason_missing:
-                problems.append("LSP servers missing: " + ", ".join(mason_missing))
-        state = combine(states)
-        detail = f"{len(list(self.PLUGGED.iterdir()))} plugins" if state == "ok" else ", ".join(problems)
-        return state, detail
-
-    def install(self):
-        if not shutil.which("nvim"):
-            raise RuntimeError("nvim not installed - run the system packages component first")
-        for target, link in self._links():
-            ensure_symlink(target, link)
-        autoload = self._autoload()
-        if not autoload.exists():
-            download("https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim", autoload)
-            console.print("  installed vim-plug")
-        run(["nvim", "--headless", "+PlugInstall", "+qa"])
-        # :PlugClean! is unreliable headlessly; prune undeclared plugins directly
-        declared = re.findall(r"Plug\s+'[^/]+/([^']+)'", (REPO / "vimrc").read_text())
-        if self.PLUGGED.is_dir():
-            for d in self.PLUGGED.iterdir():
-                if d.is_dir() and d.name not in declared:
-                    console.print(f"  removing unused plugin: {d.name}")
-                    shutil.rmtree(d)
-        version = nvim_version()
-        if version and version >= (0, 11):
-            if self._mason_missing():
-                run(["nvim", "--headless", "+MasonInstall " + " ".join(self.LSP_SERVERS), "+qa"])
-        else:
-            console.print("  [yellow]nvim < 0.11: skipping LSP servers (vimrc skips LSP there too)[/]")
-
-
-class ClaudeConfig:
+class ClaudeConfig(Component):
     name = "claude"
 
     def _links(self):
@@ -448,12 +459,12 @@ class ClaudeConfig:
             (REPO / "claude/CLAUDE.md", HOME / ".claude/CLAUDE.md"),
         ]
 
-    def detect(self):
-        states = [link_state(link, target) for target, link in self._links()]
-        state = combine(states)
-        detail = {"ok": "linked", "partial": "copied, not symlinked" if "copy" in states else "incomplete",
-                  "missing": "not set up"}[state]
-        return state, detail
+    def items(self):
+        return [(f"{short(link)} -> claude/{target.name}", link_state(link, target))
+                for target, link in self._links()]
+
+    def ok_detail(self, items):
+        return "linked"
 
     def install(self):
         settings_link = HOME / ".claude/settings.json"
@@ -505,6 +516,15 @@ def print_status(status):
     console.print(table)
 
 
+def print_items(component):
+    table = Table(title=component.name, title_justify="left")
+    table.add_column("")
+    table.add_column("item")
+    for label, state in component.items():
+        table.add_row(MARKS[state], label)
+    console.print(table)
+
+
 def install_component(component):
     console.print(f"\n[bold]Installing: {component.name}[/]")
     try:
@@ -516,6 +536,18 @@ def install_component(component):
         return False
 
 
+def dive(component):
+    while True:
+        console.clear()
+        print_items(component)
+        action = questionary.select("What do you want to do?",
+                                    choices=["Install this component", "Back"]).ask()
+        if action != "Install this component":
+            return
+        install_component(component)
+        questionary.press_any_key_to_continue().ask()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--status", action="store_true", help="print status and exit")
@@ -523,6 +555,8 @@ def main():
     args = parser.parse_args()
 
     if args.status:
+        for c in COMPONENTS:
+            print_items(c)
         print_status(gather_status())
         return
 
@@ -544,27 +578,28 @@ def main():
         console.print("[bold]env_setup[/] - deploy the dev setup\n")
         status = gather_status()
         print_status(status)
-        missing = [(c, state) for c, state, _ in status if state != "ok"]
+        missing = [c for c, state, _ in status if state != "ok"]
 
         choices = []
         if missing:
-            choices.append(f"Install everything missing ({len(missing)})")
-        choices += ["Install one component ...", "Refresh", "Quit"]
-        answer = questionary.select("What do you want to do?", choices=choices).ask()
+            choices.append(questionary.Choice(f"Install everything missing ({len(missing)})", value="all"))
+        for c, state, _ in status:
+            label = {"ok": "", "partial": "  (partial)", "missing": "  (missing)"}[state]
+            choices.append(questionary.Choice(f"{c.name}{label} ...", value=c))
+        choices.append(questionary.Choice("Refresh", value="refresh"))
+        choices.append(questionary.Choice("Quit", value="quit"))
+        answer = questionary.select("Select a component to inspect, or an action:", choices=choices).ask()
 
-        if answer is None or answer == "Quit":
+        if answer is None or answer == "quit":
             return
-        if answer == "Refresh":
+        if answer == "refresh":
             continue
-        if answer.startswith("Install everything"):
-            for c, _ in missing:
+        if answer == "all":
+            for c in missing:
                 install_component(c)
+            questionary.press_any_key_to_continue().ask()
         else:
-            names = [c.name for c, _, _ in status]
-            pick = questionary.select("Which component?", choices=names + ["Back"]).ask()
-            if pick and pick != "Back":
-                install_component(next(c for c in COMPONENTS if c.name == pick))
-        questionary.press_any_key_to_continue().ask()
+            dive(answer)
 
 
 if __name__ == "__main__":
