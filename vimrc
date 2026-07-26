@@ -18,6 +18,7 @@ endif
 Plug 'scrooloose/nerdcommenter'
 Plug 'nvie/vim-flake8'
 Plug 'tpope/vim-repeat'
+Plug 'mg979/vim-visual-multi'               " replaces terryma/vim-multiple-cursors (unmaintained)
 Plug 'kana/vim-submode'
 Plug 'rhysd/vim-grammarous'
 Plug 'reedes/vim-wordy'
@@ -170,6 +171,14 @@ set foldnestmax=10
 set nofoldenable
 set foldlevel=2
 let g:jsx_ext_required = 0
+
+" Multi-cursor is opt-in only: no default Ctrl+N / Ctrl+arrow grabs.
+" <leader>m on a word starts it (then: n = next occurrence, q = skip,
+" Q = remove cursor, Tab = cursor/extend mode, Esc = exit).
+let g:VM_default_mappings = 0
+let g:VM_maps = {}
+let g:VM_maps['Find Under'] = '<leader>m'
+let g:VM_maps['Find Subword Under'] = '<leader>m'
 
 let g:NERDSpaceDelims = 1
 nnoremap <C-c> :call NERDComment(0,"toggle")<CR>
