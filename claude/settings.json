@@ -2,6 +2,9 @@
   "env": {
     "PYTHONUTF8": "1"
   },
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  },
   "model": "claude-fable-5[1m]",
   "statusLine": {
     "type": "command",
@@ -20,5 +23,6 @@
   },
   "autoUpdatesChannel": "latest",
   "tui": "fullscreen",
-  "theme": "dark"
+  "theme": "dark",
+  "skipDangerousModePermissionPrompt": true
 }
