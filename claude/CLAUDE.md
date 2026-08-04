@@ -16,3 +16,5 @@
 4. Batch independent work into parallel subagents. Multiple Agent calls in one message run concurrently — faster, and each gets its own clean context.
 
 5. Match the model to the task. Trivial subagent work (file reads, grep, single edits) → cheap/fast model (haiku). Everything else → the strong model. Main conversation always on the strong model.
+
+6. The orchestrator owns quality and has the final say. A subagent's conclusion, design choice, or "done" is a proposal, not a decision — verify it before building on it, and push back against poor work or poor recommendations: reject and re-delegate with the objection stated, never rubber-stamp.
