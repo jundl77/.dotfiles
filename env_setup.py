@@ -510,6 +510,8 @@ class ClaudeConfig(Component):
         return [
             (REPO / "claude/settings.json", HOME / ".claude/settings.json"),
             (REPO / "claude/CLAUDE.md", HOME / ".claude/CLAUDE.md"),
+            # Whole directory: new skills added to the repo deploy without setup changes.
+            (REPO / "claude/skills", HOME / ".claude/skills"),
         ]
 
     def items(self):
