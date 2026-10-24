@@ -1,0 +1,4 @@
+interface:
+  display_name: "Blind Naming Test"
+  short_description: "Compare blind name predictions with implementation"
+  default_prompt: "Use $blind-naming-test to review identifier clarity in the requested code scope."

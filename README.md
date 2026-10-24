@@ -1,7 +1,7 @@
 # My dotfile configs
 
 One Python installer (`env_setup.py`) deploys the full dev setup on any
-platform: packages, shell + editor + terminal config, and Claude Code config.
+platform: packages, shell + editor + terminal config, Claude Code config, and shared Codex skills.
 
 ## Usage
 
@@ -19,7 +19,7 @@ installed into your system Python.
 
 ## What it manages
 
-The same five components on every OS — each just does the platform-appropriate thing:
+The same six components on every OS — each just does the platform-appropriate thing:
 
 | Component | What it does |
 |---|---|
@@ -27,7 +27,8 @@ The same five components on every OS — each just does the platform-appropriate
 | system packages | winget (Windows: nvim, ripgrep, node) / brew (macOS) / apt (Linux) |
 | vim/nvim | symlinks `vimrc` (as `init.vim` for nvim) + `ideavimrc`, vim-plug, `:PlugInstall`, prunes removed plugins, Mason installs pyright + lua-language-server (nvim 0.11+) |
 | terminal setup | Windows: PowerShell profile (Agnoster-style prompt + unix aliases), execution policy, Meslo Nerd Font, Material Design color scheme, CSI-u keybinds so Ctrl+Shift+F/N reach nvim. macOS/Linux: fish config + bashrc hook |
-| claude | symlinks `claude/settings.json` and `claude/CLAUDE.md` into `~/.claude` (machine-specific keys already in a real `settings.json` are moved to `settings.local.json`, which stays local) |
+| claude | symlinks `claude/settings.json`, `claude/CLAUDE.md`, and the shared `claude/skills` directory into `~/.claude` (machine-specific settings stay in `settings.local.json`) |
+| codex skills | links `blind-naming-test` from `claude/skills` into `~/.codex/skills`, preserving `.system` and unrelated skills; refuses to replace a conflicting skill |
 
 The shared `settings.json` carries the `claude-statusbar` status line as
 `python -m claude_statusbar.cli render`. Two reasons it must stay in that exact
@@ -48,6 +49,11 @@ Configs are **symlinked** into place so a `git pull` updates the live setup.
 On Windows without symlink privilege it falls back to copying and tells you
 (enable Developer Mode + sign out/in, then re-run to upgrade copies to links).
 Pre-existing real files are backed up once as `<name>.backup`.
+
+Run `python env_setup.py --install "codex skills"` to link the naming review skill
+in Codex. This component requires symlink support (Developer Mode on Windows),
+preserves conflicts, and never falls back to copies. Claude uses its existing
+skills-directory link.
 
 ## vimrc
 

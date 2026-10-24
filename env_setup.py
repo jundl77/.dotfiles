@@ -550,8 +550,34 @@ class ClaudeConfig(Component):
             ensure_symlink(target, link)
 
 
+class CodexSkills(Component):
+    name = "codex skills"
+
+    def _links(self):
+        # Link only shared, compatible skills; never replace Codex's .system tree.
+        return [(REPO / "claude/skills/blind-naming-test",
+                 HOME / ".codex/skills/blind-naming-test")]
+
+    def items(self):
+        return [(f"{short(link)} -> claude/skills/{target.name}", link_state(link, target))
+                for target, link in self._links()]
+
+    def ok_detail(self, items):
+        return "linked"
+
+    def install(self):
+        for target, link in self._links():
+            if link_state(link, target) == "ok":
+                continue
+            if link.exists() or link.is_symlink():
+                raise RuntimeError(f"Preserving existing skill at {short(link)}; resolve the conflict manually")
+            link.parent.mkdir(parents=True, exist_ok=True)
+            link.symlink_to(target, target_is_directory=True)
+            console.print(f"  linked {short(link)} -> {short(target)}")
+
+
 COMPONENTS = [
-    GitIdentity(), Packages(), VimNvim(), TerminalSetup(), ClaudeConfig(),
+    GitIdentity(), Packages(), VimNvim(), TerminalSetup(), ClaudeConfig(), CodexSkills(),
 ]
 
 
