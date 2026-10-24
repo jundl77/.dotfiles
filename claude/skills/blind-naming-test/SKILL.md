@@ -1,19 +1,21 @@
 ---
 name: blind-naming-test
-description: Test identifier clarity with fresh blind readers during software review cycles or when requested. Compare names-only predictions with implementation, then rename and retest unclear names. Not an automatic audit on every edit.
+description: Review important identifier names with fresh blind readers. Compare names-only predictions with implementation, then rename and retest misleading names. Use during requested naming or code reviews.
 ---
 
 # Blind naming test
 
-In normal review cycles, cover new or changed concepts; review the whole repository
-only when explicitly requested. Inventory first-party variables (parameters,
-fields, constants, locals), functions/methods, structs/classes and other defined
-symbols, including short/private names. Record excluded paths and reasons.
-Use existing tools or manual inspection; parser output alone proves neither
-complete coverage nor semantic alignment. Leave inventory gaps explicit.
+Cap the review at important concepts: public interfaces, domain decisions,
+protocols, ownership, timing and units, buffer bounds, telemetry and data
+contracts. Include private names when misunderstanding them could cause a bug.
+Skip routine locals, loop indices, framework names and stylistic preferences.
+A repository-wide pass covers these important concepts across components;
+it does not require an exhaustive identifier inventory.
 
-Account for each scoped identifier. Group occurrences only when they mean the
-same concept; identical spellings in different scopes may need separate reviews.
+Choose a bounded, source-grounded list before starting. Prioritize misleading
+names over merely terse ones. Do not expand the pass indefinitely or delay
+shipping a validated change to rename low-impact symbols. Group occurrences
+only when they mean the same concept.
 
 1. The main reviewer independently reads implementation and relevant callers,
    recording the actual meaning with file/line evidence. Include distinguishing
@@ -57,8 +59,8 @@ attempts: # append; never overwrite failed attempts
 disposition: aligned / contextual exception with reason / pending with reason
 ```
 
-After edits, reconcile names and locations while retaining attempt history. Close
-only when every scoped concept is aligned or explicitly excepted. If retries stop
+After edits, reconcile the selected names and locations while retaining attempt history. Close
+when the important selected concepts are aligned or explicitly excepted. If retries stop
 improving names, a safe rename is blocked, or the review budget is exhausted,
 record unresolved coverage honestly. Report scope, renames, exceptions, checks and
-remaining gaps concisely; untested names never count as passed.
+remaining important gaps concisely; do not claim exhaustive coverage.
